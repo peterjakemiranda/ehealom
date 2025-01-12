@@ -1,0 +1,12 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.table :where(th, td) {
+  padding: 6px;
+}
+
+.btn:disabled {
+  border: 1px solid #ddd;
+  color: #ddd;
+}
