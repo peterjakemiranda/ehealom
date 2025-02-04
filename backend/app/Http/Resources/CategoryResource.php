@@ -17,13 +17,12 @@ class CategoryResource extends JsonResource
         return [
             'id' => $this->id,
             'uuid' => $this->uuid,
-            'name' => $this->name,
+            'title' => $this->title,
             'description' => $this->description,
-            'interest_rate' => $this->interest_rate,
-            'penalty_rate' => $this->penalty_rate,
-            'loan_period' => $this->loan_period,
-            'loan_period_type' => $this->loan_period_type,
-            'grace_period' => $this->grace_period,
+            'image_url' => $this->image_url,
+            'image_path' => $this->image_path,
+            'created_at' => $this->created_at,
+            'updated_at' => $this->updated_at,
         ];
     }
 }

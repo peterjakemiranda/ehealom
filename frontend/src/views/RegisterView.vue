@@ -26,6 +26,6 @@ const router = useRouter()
 
 const onRegistrationSuccess = () => {
   // You can add a success message here if you want
-  router.push({ name: 'Dashboard' })
+  router.push({ name: 'Appointments' })
 }
 </script>

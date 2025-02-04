@@ -7,7 +7,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
-use App\Models\Company;
+use Spatie\Permission\Models\Role;
 
 class AuthController extends Controller
 {
@@ -17,26 +17,19 @@ class AuthController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
-            'company_name' => 'nullable|string|max:255',
+            'user_type' => 'required|string|in:student,personnel',
         ]);
 
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
+            'user_type' => $request->user_type,
         ]);
 
-        // Create company and associate with user
-        $company = Company::create([
-            'name' => $request->company_name ?? $request->name,
-            'status' => true
-        ]);
-
-        // Attach company to user and set as default
-        $user->companies()->attach($company->id, ['is_default' => true]);
-
-        // Assign default role if needed
-        $user->assignRole('user');
+        // Assign role based on user type
+        $role = $request->user_type === 'student' ? 'student' : 'personnel';
+        $user->assignRole($role);
 
         $token = $user->createToken('authToken')->plainTextToken;
 
@@ -69,11 +62,10 @@ class AuthController extends Controller
         ]);
     }
 
-    public function me(Request $request)
+    public function me()
     {
         $user = auth()->user();
         return response()->json([
-            'uuid' => $user->uuid,
             'user' => $user,
             'permissions' => $user->getAllPermissions()->pluck('name'),
             'roles' => $user->getRoleNames()
@@ -84,5 +76,42 @@ class AuthController extends Controller
     {
         $request->user()->currentAccessToken()->delete();
         return response()->json(['message' => 'Logged out']);
+    }
+
+    public function updateProfile(Request $request)
+    {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users,email,' . auth()->id(),
+            'current_password' => 'required_with:new_password|string',
+            'new_password' => 'nullable|string|min:8|confirmed',
+        ]);
+
+        $user = auth()->user();
+
+        // Verify current password if trying to change password
+        if ($request->has('new_password')) {
+            if (!Hash::check($request->current_password, $user->password)) {
+                throw ValidationException::withMessages([
+                    'current_password' => ['The provided password is incorrect.'],
+                ]);
+            }
+        }
+
+        $updateData = [
+            'name' => $request->name,
+            'email' => $request->email,
+        ];
+
+        if ($request->filled('new_password')) {
+            $updateData['password'] = Hash::make($request->new_password);
+        }
+
+        $user->update($updateData);
+
+        return response()->json([
+            'user' => $user,
+            'message' => 'Profile updated successfully'
+        ]);
     }
 }

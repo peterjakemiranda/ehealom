@@ -10,7 +10,6 @@ export const useSettingsStore = defineStore('settings', {
       site_logo: '',
       business_name: '',
       business_address: '',
-      pawn_ticket_header: ''  // Add this line
     },
     isLoading: false,
     error: null,
@@ -22,7 +21,6 @@ export const useSettingsStore = defineStore('settings', {
     getSiteLogo: (state) => state.settings.site_logo,
     getBusinessName: (state) => state.settings.business_name,
     getBusinessAddress: (state) => state.settings.business_address,
-    getPawnTicketHeader: (state) => state.settings.pawn_ticket_header
   },
 
   actions: {

@@ -1,118 +1,98 @@
 <template>
   <div class="space-y-4">
-    <form @submit.prevent="onSubmit" class="card bg-white p-2">
-      <div class="form-control mb-2">
+    <form @submit.prevent="onSubmit" class="card bg-white p-4">
+      <div class="form-control mb-4">
         <label class="label">
-          <span class="label-text text-gray-700">Category Name</span>
+          <span class="label-text text-gray-700">Title</span>
         </label>
-        <input v-model="formData.name" type="text" class="input input-bordered bg-gray-50" required />
+        <input 
+          v-model="formData.title" 
+          type="text" 
+          class="input input-bordered bg-gray-50" 
+          required 
+        />
       </div>
 
-      <div class="form-control mb-2">
+      <div class="form-control mb-4">
         <label class="label">
           <span class="label-text text-gray-700">Description</span>
         </label>
         <textarea
           v-model="formData.description"
           class="textarea textarea-bordered bg-gray-50"
-          rows="2"
+          rows="3"
         ></textarea>
       </div>
 
-      <div class="grid grid-cols-2 gap-4">
-        <div class="form-control">
-          <label class="label">
-            <span class="label-text text-gray-700">Interest Rate (%)</span>
-          </label>
-          <input
-            v-model.number="formData.interest_rate"
-            type="number"
-            step="0.01"
-            min="0"
-            max="100"
-            class="input input-bordered bg-gray-50"
-            required
-          />
-        </div>
+      <!-- Tag Input -->
+      <div class="form-control mb-4">
+        <label class="label">
+          <span class="label-text text-gray-700">Tags</span>
+        </label>
+        <div class="relative">
+          <div class="flex flex-wrap gap-2 p-2 border rounded-lg bg-gray-50 min-h-[3rem]">
+            <!-- Selected Tags -->
+            <div v-for="tag in selectedTags" :key="tag"
+                 class="badge badge-primary gap-1">
+              {{ tag }}
+              <button type="button" @click="removeTag(tag)" class="btn btn-ghost btn-xs px-1">
+                ×
+              </button>
+            </div>
+            
+            <!-- Input -->
+            <input
+              v-model="tagInput"
+              @keydown.enter.prevent="addTag"
+              @keydown.backspace="handleBackspace"
+              @focus="showSuggestions = true"
+              type="text"
+              class="input input-ghost input-sm flex-1 min-w-[100px]"
+              placeholder="Type to add tags..."
+            />
+          </div>
 
-        <div class="form-control">
-          <label class="label">
-            <span class="label-text text-gray-700">Penalty Rate (%)</span>
-          </label>
-          <input
-            v-model.number="formData.penalty_rate"
-            type="number"
-            step="0.01"
-            min="0"
-            max="100"
-            class="input input-bordered bg-gray-50"
-            required
-          />
+          <!-- Suggestions Dropdown -->
+          <div v-if="showSuggestions && filteredSuggestions.length > 0"
+               class="suggestions-dropdown absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg">
+            <div v-for="suggestion in filteredSuggestions" 
+                 :key="suggestion"
+                 @click="selectSuggestion(suggestion)"
+                 class="px-4 py-2 hover:bg-gray-100 cursor-pointer">
+              {{ suggestion }}
+            </div>
+          </div>
         </div>
       </div>
 
-      <div class="grid grid-cols-2 gap-4 mt-2">
-        <div class="form-control">
-          <label class="label">
-            <span class="label-text text-gray-700">Loan Period</span>
-          </label>
-          <div class="flex gap-2">
-            <input
-              v-model.number="formData.loan_period"
-              type="number"
-              min="1"
-              class="input input-bordered bg-gray-50 w-24"
-              required
-            />
-            <select v-model="formData.loan_period_type" class="select select-bordered bg-gray-50 flex-1">
-              <option value="day">Days</option>
-              <option value="month">Months</option>
-              <option value="year">Years</option>
-            </select>
-          </div>
-        </div>
-        <div class="form-control">
+      <div class="form-control mb-4">
         <label class="label">
-          <span class="label-text text-gray-700">Grace Period (days)</span>
+          <span class="label-text text-gray-700">Category Image</span>
         </label>
         <input
-          v-model.number="formData.loan_period_expiry"
-          type="number"
-          min="0"
-          class="input input-bordered bg-gray-50"
-          required
+          type="file"
+          @change="handleFileChange"
+          class="file-input file-input-bordered bg-gray-50 w-full"
+          accept="image/*"
         />
         <label class="label">
           <span class="label-text-alt text-gray-500">
-            Additional days after maturity before the loan expires
+            Max file size: 2MB. Supported formats: JPG, PNG, GIF
           </span>
         </label>
-      </div>
-
-      </div>
-
-      
-    <div class="form-control">
-      <label class="label cursor-pointer">
-        <span class="label-text text-gray-700">Is Renewable?</span>
-        <div class="flex items-center gap-2">
-        <input
-          type="checkbox"
-          class="toggle toggle-primary"
-          :checked="formData.is_renewable"
-          @change="formData.is_renewable = $event.target.checked"
-        />
-        <span class="text-xs text-gray-500">Yes</span>
+        
+        <!-- Preview image -->
+        <div v-if="imagePreview" class="mt-2">
+          <img :src="imagePreview" alt="Preview" class="w-32 h-32 object-cover rounded-lg" />
         </div>
-      </label>
-    </div>
+      </div>
 
       <div class="mt-6 flex gap-4">
         <button type="button" class="btn btn-ghost w-1/2" @click="$emit('cancel')">
           Cancel
         </button>
         <button type="submit" class="btn btn-primary w-1/2" :disabled="isLoading">
-          {{ formData.id ? 'Update' : 'Create' }} Category
+          {{ formData.uuid ? 'Update' : 'Create' }} Category
         </button>
       </div>
     </form>
@@ -120,8 +100,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
-import { v4 as uuidv4 } from 'uuid'
+import { ref, watch, onUnmounted, computed, onMounted } from 'vue'
 
 const props = defineProps({
   category: {
@@ -132,34 +111,107 @@ const props = defineProps({
 
 const emit = defineEmits(['save', 'cancel'])
 const isLoading = ref(false)
-const formData = ref({
-  uuid: props.category.uuid || crypto.randomUUID(),
-  localId: props.category.localId || Date.now(),
-  name: props.category.name || '',
-  description: props.category.description || '',
-  interest_rate: props.category.interest_rate || 0,
-  penalty_rate: props.category.penalty_rate || 0,
-  loan_period: props.category.loan_period || 1,
-  loan_period_type: props.category.loan_period_type || 'month',
-  loan_period_expiry: props.category.loan_period_expiry || 0,
-  is_renewable: Boolean(props.category.is_renewable),
-  sync_status: 'pending',
-  created_at: props.category.created_at || new Date().toISOString(),
-  updated_at: new Date().toISOString()
+const imagePreview = ref(null)
+const tagInput = ref('')
+const selectedTags = ref([])
+const showSuggestions = ref(false)
+
+// Example tag suggestions - you can replace with your own list
+const tagSuggestions = [
+  'Anxiety', 'Depression', 'Stress', 'Self-Care', 'Mindfulness',
+  'Relationships', 'Academic', 'Career', 'Personal Growth', 'Wellness'
+]
+
+const filteredSuggestions = computed(() => {
+  if (!tagInput.value) return []
+  return tagSuggestions.filter(tag => 
+    tag.toLowerCase().includes(tagInput.value.toLowerCase()) &&
+    !selectedTags.value.includes(tag)
+  )
 })
 
-// Update watch handler to preserve uuid
+const formData = ref({
+  uuid: props.category.uuid || crypto.randomUUID(),
+  title: props.category.title || '',
+  description: props.category.description || '',
+  image: null
+})
+
+function addTag() {
+  const tag = tagInput.value.trim()
+  if (tag && !selectedTags.value.includes(tag)) {
+    selectedTags.value.push(tag)
+  }
+  tagInput.value = ''
+}
+
+function removeTag(tag) {
+  selectedTags.value = selectedTags.value.filter(t => t !== tag)
+}
+
+function selectSuggestion(tag) {
+  if (!selectedTags.value.includes(tag)) {
+    selectedTags.value.push(tag)
+  }
+  tagInput.value = ''
+  showSuggestions.value = false
+}
+
+function handleBackspace(event) {
+  if (!tagInput.value && selectedTags.value.length > 0) {
+    event.preventDefault()
+    selectedTags.value.pop()
+  }
+}
+
+// Handle click outside manually
+function handleClickOutside(event) {
+  const dropdown = document.querySelector('.suggestions-dropdown')
+  if (dropdown && !dropdown.contains(event.target)) {
+    showSuggestions.value = false
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside)
+  if (imagePreview.value && !imagePreview.value.includes('http')) {
+    URL.revokeObjectURL(imagePreview.value)
+  }
+})
+
 watch(() => props.category, (newVal) => {
   formData.value = {
     ...formData.value,
-    ...newVal,
-    uuid: formData.value.uuid, // Keep existing uuid
-    localId: formData.value.localId, // Keep existing localId
-    is_renewable: Boolean(newVal.is_renewable),
-    sync_status: 'pending',
-    updated_at: new Date().toISOString()
+    uuid: newVal.uuid,
+    title: newVal.title,
+    description: newVal.description
   }
-}, { deep: true })
+  // Set image preview if category has an image
+  if (newVal.image_path) {
+    imagePreview.value = newVal.image_path
+  }
+}, { deep: true, immediate: true })  // Added immediate: true to run on mount
+
+function handleFileChange(event) {
+  const file = event.target.files[0]
+  if (file) {
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file')
+      event.target.value = ''
+      return
+    }
+    formData.value.image = file
+    // Create preview URL and revoke old one if exists
+    if (imagePreview.value && !imagePreview.value.includes('http')) {
+      URL.revokeObjectURL(imagePreview.value)
+    }
+    imagePreview.value = URL.createObjectURL(file)
+  }
+}
 
 async function onSubmit() {
   try {
@@ -170,3 +222,13 @@ async function onSubmit() {
   }
 }
 </script>
+
+<style scoped>
+.input-ghost {
+  @apply bg-transparent border-none focus:outline-none focus:ring-0;
+}
+
+.input-ghost::placeholder {
+  @apply text-gray-400;
+}
+</style>

@@ -30,6 +30,23 @@ class UserController extends Controller
                           ->orWhere('email', 'like', "%{$value}%");
                     });
                 }),
+                AllowedFilter::callback('user_type', function ($query, $value) {
+                    // Map user_type to role name
+                    $roleMap = [
+                        'student' => 'student',
+                        'counselor' => 'counselor',
+                        'personnel' => 'personnel'
+                    ];
+                    
+                    if (isset($roleMap[$value])) {
+                        $query->whereHas('roles', function($q) use ($roleMap, $value) {
+                            $q->where('name', $roleMap[$value]);
+                        });
+                        if ($value === 'counselor') {
+                            $query->has('roles', '=', 1);
+                        }
+                    }
+                }),
                 AllowedFilter::exact('status'),
             ])
             ->with('roles')
@@ -46,14 +63,15 @@ class UserController extends Controller
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
             'password' => ['required', Password::defaults()],
             'roles' => ['required', 'array'],
-            'roles.*' => ['exists:roles,name']
+            'roles.*' => ['exists:roles,name'],
+            'status' => ['sometimes', 'boolean']
         ]);
 
         $user = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
-            'status' => true
+            'status' => $validated['status'] ?? true
         ]);
 
         $user->assignRole($validated['roles']);

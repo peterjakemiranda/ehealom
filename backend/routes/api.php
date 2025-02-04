@@ -14,6 +14,12 @@ use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\SyncController;
 use App\Http\Controllers\Api\SettingController;
 use App\Http\Controllers\Api\CompanyController;
+use App\Http\Controllers\Api\EmergencyController;
+use App\Http\Controllers\Api\EmergencyHotlineController;
+use App\Http\Controllers\Api\FirstAidController;
+use App\Http\Controllers\Api\AlertController;
+use App\Http\Controllers\Api\ResourceController;
+use App\Http\Controllers\Api\AppointmentController;
 
 /*
 |--------------------------------------------------------------------------
@@ -29,31 +35,64 @@ use App\Http\Controllers\Api\CompanyController;
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
 
-    Route::apiResource('customers', CustomerController::class);
     Route::apiResource('categories', CategoryController::class);
     
+    Route::apiResource('roles', RoleController::class);
     Route::apiResource('users', UserController::class);
+
     Route::patch('users/{user}/toggle-status', [UserController::class, 'toggleStatus']);
 
-    Route::apiResource('roles', RoleController::class);
     Route::get('permissions', [RoleController::class, 'permissions']);
     Route::post('roles/assign', [RoleController::class, 'assignRole']);
-    
-    Route::get('/sync', [SyncController::class, 'sync']);
-    
-    // Company routes
-    Route::get('/user/companies', [CompanyController::class, 'getUserCompanies']);
-    Route::get('/companies/{uuid}', [CompanyController::class, 'show']);
-    Route::post('/companies', [CompanyController::class, 'store']);
-    Route::put('/companies/{uuid}', [CompanyController::class, 'update']);
-    Route::delete('/companies/{uuid}', [CompanyController::class, 'destroy']);
-    Route::patch('/companies/{uuid}/set-default', [CompanyController::class, 'setDefault']);
     
     // Settings routes
     Route::get('/settings', [SettingController::class, 'index']);
     Route::post('/settings', [SettingController::class, 'update']);
+    
+    Route::put('/auth/profile', [AuthController::class, 'updateProfile']);
+
+    Route::apiResource('alerts', AlertController::class);
+
+    // Resource routes with permissions
+    Route::prefix('resources')->group(function () {
+        Route::get('/', [ResourceController::class, 'index'])
+            ->middleware('permission:view resources');
+        
+        Route::post('/', [ResourceController::class, 'store'])
+            ->middleware('permission:manage resources');
+        
+        Route::get('/{resource}', [ResourceController::class, 'show'])
+            ->middleware('permission:view resources');
+        
+        Route::put('/{resource}', [ResourceController::class, 'update'])
+            ->middleware('permission:manage resources');
+        
+        Route::delete('/{resource}', [ResourceController::class, 'destroy'])
+            ->middleware('permission:manage resources');
+    });
+
+    // Appointment routes with permissions
+    Route::prefix('appointments')->group(function () {
+        Route::get('/', [AppointmentController::class, 'index'])
+            ->middleware('permission:view appointments');
+        
+        Route::post('/', [AppointmentController::class, 'store'])
+            ->middleware('permission:manage appointments');
+        
+        Route::get('/available-slots', [AppointmentController::class, 'availableSlots'])
+            ->middleware('permission:view appointments');
+        
+        Route::put('/{appointment}/status', [AppointmentController::class, 'updateStatus'])
+            ->middleware('permission:manage appointments');
+        
+        Route::get('/{appointment}', [AppointmentController::class, 'show'])
+            ->middleware('permission:view appointments');
+        
+        Route::put('/{appointment}', [AppointmentController::class, 'update'])
+            ->middleware('permission:manage appointments');
+    });
 });

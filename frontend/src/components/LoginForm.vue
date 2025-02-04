@@ -38,7 +38,7 @@ const password = ref('')
 const handleSubmit = async () => {
   const success = await auth.login(email.value, password.value)
   if (success) {
-    router.push('/')
+    router.push('/appointments')
   } else {
     // Handle login error (e.g., show error message)
   }

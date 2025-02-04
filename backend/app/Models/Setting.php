@@ -9,7 +9,7 @@ class Setting extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['company_id', 'key', 'value', 'type', 'description'];
+    protected $fillable = ['key', 'value', 'type', 'description'];
 
     // Cast method to handle different types
     public function getValueAttribute($value)
@@ -21,10 +21,5 @@ class Setting extends Model
             'json' => json_decode($value, true),
             default => $value
         };
-    }
-
-    public function company()
-    {
-        return $this->belongsTo(Company::class);
     }
 }

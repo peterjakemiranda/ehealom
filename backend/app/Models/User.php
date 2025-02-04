@@ -24,7 +24,13 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
-        'status'
+        'status',
+        'student_id',
+        'department',
+        'course',
+        'year_level',
+        'phone',
+        'is_active'
     ];
 
     /**
@@ -68,5 +74,21 @@ class User extends Authenticatable
     public function defaultCompany()
     {
         return $this->companies()->wherePivot('is_default', true)->first();
+    }
+
+    // Add helper methods for role checks
+    public function isStudent()
+    {
+        return $this->hasRole('student');
+    }
+
+    public function isCounselor()
+    {
+        return $this->hasRole('counselor');
+    }
+
+    public function isPersonnel()
+    {
+        return $this->hasRole('personnel');
     }
 }

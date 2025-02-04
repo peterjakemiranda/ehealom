@@ -91,22 +91,6 @@
             </label>
           </div>
 
-          <!-- Pawn Ticket Header -->
-          <div class="form-control mb-6">
-            <label class="label">
-              <span class="label-text">Pawn Ticket Header</span>
-            </label>
-            <textarea
-              v-model="form.pawn_ticket_header"
-              class="textarea textarea-bordered h-24"
-              :class="{ 'textarea-error': errors.pawn_ticket_header }"
-              placeholder="Enter pawn ticket header"
-            ></textarea>
-            <label class="label" v-if="errors.pawn_ticket_header">
-              <span class="label-text-alt text-error">{{ errors.pawn_ticket_header }}</span>
-            </label>
-          </div>
-
           <div class="flex justify-end gap-2">
             <button type="button" class="btn btn-ghost" @click="resetForm">Reset</button>
             <button type="submit" class="btn btn-primary" :disabled="settingsStore.isLoading">
@@ -135,7 +119,6 @@ const form = ref({
   site_logo: null,
   business_name: '',
   business_address: '',
-  pawn_ticket_header: ''
 })
 
 const handleFileChange = (event) => {
@@ -163,7 +146,6 @@ const handleSubmit = async () => {
       site_name: form.value.site_name,
       business_name: form.value.business_name,
       business_address: form.value.business_address,
-      pawn_ticket_header: form.value.pawn_ticket_header,
       site_logo: form.value.site_logo instanceof File ? null : form.value.site_logo
     }
 

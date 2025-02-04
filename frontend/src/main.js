@@ -23,15 +23,15 @@ const authStore = useAuthStore()
 
 async function initApp() {
     try {
-        await ensureDbInitialized();
+        // await ensureDbInitialized();
         await authStore.initializeAuth();
         
         // Mount the app immediately
         app.mount('#app');
         
-        if (authStore.isAuthenticated) {
-          backgroundSync.initialize();
-        }
+        // if (authStore.isAuthenticated) {
+        //   backgroundSync.initialize();
+        // }
     } catch (error) {
         console.error('Failed to initialize app:', error);
     }

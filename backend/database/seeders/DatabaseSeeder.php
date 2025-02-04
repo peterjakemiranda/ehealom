@@ -13,17 +13,23 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-
-            User::updateOrCreate(['email' => 'admin@example.com'], [
+        // Create default admin user if it doesn't exist
+        $admin = User::firstOrCreate(
+            ['email' => 'admin@user.com'],
+            [
                 'name' => 'Admin',
-                'email' => 'admin@example.com',
                 'password' => Hash::make('123456'),
-            ]);
+                'email_verified_at' => now(),
+            ]
+        );
 
-            $this->call([
-                RoleSeeder::class,
-                PermissionSeeder::class,
-                RolePermissionSeeder::class,
-            ]);
+        // Run the consolidated roles and permissions seeder
+        $this->call([
+            RolesAndPermissionsSeeder::class,
+            CategorySeeder::class,
+        ]);
+
+        // Ensure admin has admin role
+        $admin->syncRoles(['admin']);
     }
 }

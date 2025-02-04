@@ -3,72 +3,68 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\StoreCategoryRequest;
-use App\Http\Requests\UpdateCategoryRequest;
-use App\Http\Resources\CategoryResource;
 use App\Models\Category;
 use Illuminate\Http\Request;
+use App\Http\Resources\CategoryResource;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Storage;
 
 class CategoryController extends Controller
 {
-    public function index(Request $request)
+    public function index()
     {
-        $query = Category::query();
-        
-        // Add search functionality
-        if ($request->has('search')) {
-            $searchTerm = $request->search;
-            $query->where(function($q) use ($searchTerm) {
-                $q->where('name', 'LIKE', "%{$searchTerm}%")
-                  ->orWhere('description', 'LIKE', "%{$searchTerm}%");
-            });
+        $categories = Category::orderBy('title')->get();
+        return CategoryResource::collection($categories);
+    }
+
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048'
+        ]);
+
+        $imageUrl = null;
+        if ($request->hasFile('image')) {
+            $imageUrl = $request->file('image')->store('category-images', 'public');
         }
 
-        // Add sorting (optional)
-        $query->orderBy('created_at', 'desc');
-
-        // Paginate results
-        $perPage = $request->input('per_page', 10); // Default 10 items per page
-        $categories = $query->paginate($perPage);
-
-        return response()->json([
-            'data' => $categories->items(),
-            'meta' => [
-                'current_page' => $categories->currentPage(),
-                'last_page' => $categories->lastPage(),
-                'per_page' => $categories->perPage(),
-                'total' => $categories->total(),
-                'from' => $categories->firstItem(),
-                'to' => $categories->lastItem(),
-            ]
+        $category = Category::create([
+            'uuid' => Str::uuid(),
+            'title' => $validated['title'],
+            'description' => $validated['description'],
+            'image_url' => $imageUrl
         ]);
-    }
-
-    public function store(StoreCategoryRequest $request)
-    {
-        $validatedData = $request->validated();
-        $category = Category::create($validatedData);
 
         return new CategoryResource($category);
     }
 
-    public function show(Category $category)
+    public function update(Request $request, Category $category)
     {
-        return new CategoryResource($category);
-    }
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048'
+        ]);
 
-    public function update(UpdateCategoryRequest $request, Category $category)
-    {
-        $validatedData = $request->validated();
-        $category->update($validatedData);
+        if ($request->hasFile('image')) {
+            if ($category->image_url) {
+                Storage::disk('public')->delete($category->image_url);
+            }
+            $validated['image_url'] = $request->file('image')->store('category-images', 'public');
+        }
 
+        $category->update($validated);
         return new CategoryResource($category);
     }
 
     public function destroy(Category $category)
     {
+        if ($category->image_url) {
+            Storage::disk('public')->delete($category->image_url);
+        }
         $category->delete();
-
-        return response()->json(null, 204);
+        return response()->noContent();
     }
 }

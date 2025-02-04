@@ -43,7 +43,7 @@
         class="select select-bordered w-full"
         required
       >
-        <option value="" disabled selected>Select a role</option>
+        <option value="" disabled>Select a role</option>
         <option 
           v-for="role in roles" 
           :key="role.name"
@@ -65,12 +65,20 @@
       </label>
     </div>
 
-    <div class="mt-6 flex gap-4">
-      <button type="button" class="btn btn-ghost w-1/2" @click="$emit('cancel')">
+    <div class="flex justify-end gap-2 mt-6">
+      <button 
+        type="button" 
+        class="btn btn-ghost" 
+        @click="$emit('cancel')"
+      >
         Cancel
       </button>
-      <button type="submit" class="btn btn-primary w-1/2" :disabled="isLoading">
-        {{ isEditing ? 'Update' : 'Create' }} User
+      <button 
+        type="submit" 
+        class="btn btn-primary" 
+        :disabled="isLoading"
+      >
+        {{ isLoading ? 'Saving...' : (isEditing ? 'Update' : 'Create') }}
       </button>
     </div>
   </form>
@@ -101,9 +109,8 @@ const formData = ref({
   name: '',
   email: '',
   password: '',
-  roles: [''], // Initialize with empty string for single role
+  roles: [''],
   status: true,
-  sync_status: 'pending',
   created_at: null,
   updated_at: null
 })
@@ -113,14 +120,12 @@ watch(() => props.user, (newUser) => {
   formData.value = {
     ...newUser,
     uuid: newUser.uuid || uuidv4(),
-    password: '', // Always reset password
-    // Handle both object and string array formats
+    password: '',
     roles: newUser.roles?.length 
       ? Array.isArray(newUser.roles[0]) 
         ? newUser.roles 
         : [newUser.roles[0]?.name || newUser.roles[0] || '']
       : [''],
-    sync_status: newUser.id ? 'synced' : 'pending',
     created_at: newUser.created_at || new Date().toISOString(),
     updated_at: new Date().toISOString()
   }

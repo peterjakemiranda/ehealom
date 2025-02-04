@@ -5,8 +5,8 @@ import LoginView from '@/views/LoginView.vue'
 import RegisterView from '@/views/RegisterView.vue'
 import DashboardView from '@/views/DashboardView.vue'
 import CategoryList from '@/views/CategoryList.vue'
-import CustomerList from '@/views/CustomerList.vue'
-import CustomerView from '@/views/CustomerView.vue'
+import ResourceList from '@/views/ResourceList.vue'
+import AppointmentList from '@/views/AppointmentList.vue'
 
 const routes = [
   {
@@ -17,27 +17,22 @@ const routes = [
       {
         path: '',
         name: 'root',
-        component: DashboardView
-      },
-      {
-        path: '/dashboard',
-        name: 'Dashboard',
-        component: DashboardView
-      },
-      {
-        path: '/customers',
-        name: 'Customers',
-        component: CustomerList
-      },
-      {
-        path: '/customers/:uuid',
-        name: 'CustomerView',
-        component: CustomerView,
+        component: AppointmentList
       },
       {
         path: '/categories',
         name: 'Categories',
         component: CategoryList
+      },
+      {
+        path: '/resources',
+        name: 'Resources',
+        component: ResourceList
+      }, 
+      {
+        path: '/appointments',
+        name: 'Appointments',
+        component: AppointmentList
       },
       {
         path: '/settings',

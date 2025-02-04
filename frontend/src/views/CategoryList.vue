@@ -4,7 +4,7 @@
     <div class="flex justify-between items-center mb-6">
       <div>
         <h1 class="text-2xl font-bold">Categories</h1>
-        <p class="text-gray-600">Manage loan categories and their settings</p>
+        <p class="text-gray-600">Organize and manage resource categories</p>
       </div>
       <button @click="createCategory()" class="btn btn-primary">
         <PlusCircleIcon class="h-5 w-5 mr-2" />
@@ -51,52 +51,26 @@
       <div 
         v-for="category in categoryStore.categories" 
         :key="category.uuid" 
-        class="card bg-base-100 shadow-sm"
+        class="card bg-base-100 shadow-xl overflow-hidden"
       >
+        <!-- Card Image Header -->
+        <figure class="relative h-48">
+          <img 
+            :src="category.image_path || '/images/placeholder.jpg'" 
+            :alt="category.title"
+            class="w-full h-full object-cover"
+          />
+          <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+          <div class="absolute bottom-0 left-0 right-0 p-4">
+            <h3 class="text-xl font-bold text-white">{{ category.title }}</h3>
+          </div>
+        </figure>
+
         <div class="card-body">
-          <!-- Add sync status indicator -->
-          <div class="flex justify-between items-start">
-            <div>
-              <h3 class="font-bold">{{ category.name }}</h3>
-              <p class="text-sm text-gray-500">{{ category.description || 'No description' }}</p>
-            </div>
-            <div class="flex items-center gap-2">
-              <span v-if="category.sync_status === 'pending'" 
-                    class="badge badge-warning badge-sm">
-                Syncing...
-              </span>
-              <div class="badge badge-sm" :class="category.is_renewable ? 'badge-outline' : 'badge-neutral'">
-                {{ category.is_renewable ? 'Renewable' : 'Non-renewable' }}
-              </div>
-            </div>
-          </div>
+          <!-- Description -->
+          <p class="text-gray-600">{{ category.description || 'No description available' }}</p>
 
-          <div class="space-y-2 mt-4">
-            <!-- Interest and Penalty Rates -->
-            <div class="flex justify-between text-sm">
-              <span class="text-gray-600">Interest Rate:</span>
-              <span class="font-semibold">{{ category.interest_rate }}%</span>
-            </div>
-            <div class="flex justify-between text-sm">
-              <span class="text-gray-600">Penalty Rate:</span>
-              <span class="font-semibold">{{ category.penalty_rate }}%</span>
-            </div>
-
-            <!-- Divider -->
-            <div class="border-t border-gray-200 my-2"></div>
-
-            <!-- Loan Period Details -->
-            <div class="flex justify-between text-sm">
-              <span class="text-gray-600">Loan Period:</span>
-              <span>{{ category.loan_period }} {{ category.loan_period_type }}(s)</span>
-            </div>
-            <div class="flex justify-between text-sm">
-              <span class="text-gray-600">Grace Period:</span>
-              <span>{{ category.loan_period_expiry }} days</span>
-            </div>
-          </div>
-
-          <!-- Add Actions section at the bottom -->
+          <!-- Keep existing action buttons -->
           <div class="card-actions justify-end mt-4">
             <button 
               class="btn btn-primary btn-sm" 

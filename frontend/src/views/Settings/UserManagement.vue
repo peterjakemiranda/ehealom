@@ -47,7 +47,7 @@
                   <p class="mt-1 text-sm leading-5 text-gray-500">
                     {{ user.email }}
                   </p>
-                  <div class="flex gap-1 mt-1">
+                  <div class="flex gap-2 mt-1">
                     <span v-for="role in user.roles" :key="role.id" class="badge">
                       {{ role }}
                     </span>
@@ -163,7 +163,7 @@ function closeDrawer() {
 async function handleSave(userData) {
   try {
     if (isEditing.value) {
-      await userStore.updateUser(userData.id, userData)
+      await userStore.updateUser(userData.uuid, userData)
       swalHelper.toast('success', 'User updated successfully')
     } else {
       await userStore.createUser(userData)

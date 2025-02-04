@@ -16,7 +16,7 @@
           <ul class="flex flex-1 flex-col gap-y-7 px-6 py-6">
             <li>
               <ul class="-mx-2 space-y-3">
-                <li v-for="item in navigation" :key="item.name">
+                <li v-for="item in visibleNavigation" :key="item.name">
                   <template v-if="item.children">
                     <router-link
                       :to="item.href"
@@ -123,26 +123,9 @@
           </button>
 
           <div class="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
-            <form class="relative flex flex-1" action="#" method="GET">
-              <label for="search-field" class="sr-only">Search</label>
-              <MagnifyingGlassIcon
-                class="pointer-events-none absolute inset-y-0 left-0 h-full w-5 text-gray-400"
-                aria-hidden="true"
-              />
-              <input
-                id="search-field"
-                class="block bg-white h-full w-full border-0 py-0 pl-8 pr-0 text-gray-900 placeholder:text-gray-400 focus:ring-0 sm:text-sm"
-                placeholder="Search..."
-                type="search"
-                name="search"
-              />
-            </form>
+            <div class="relative flex flex-1"></div>
             
             <div class="flex items-center gap-x-4 lg:gap-x-6">
-              <!-- Company Selector - Repositioned -->
-              <div class="hidden lg:flex items-center border-r border-gray-200 pr-6">
-                <CompanySelector />
-              </div>
               
               <!-- Notifications -->
               <button type="button" class="-m-2.5 p-2.5 text-gray-400 hover:text-gray-500">
@@ -272,14 +255,38 @@
                 <ul role="list" class="flex flex-1 flex-col gap-y-7">
                   <li>
                     <ul role="list" class="-mx-2 space-y-1">
-                      <li v-for="item in navigation" :key="item.name">
+                      <li v-for="item in visibleNavigation" :key="item.name">
                         <template v-if="item.children">
-                          <div
-                            class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2"
+                          <router-link
+                            :to="item.href"
+                            custom
+                            v-slot="{ navigate }"
                           >
-                            {{ item.name }}
-                          </div>
-                          <ul v-if="isParentActive(item.href)" class="space-y-1 ml-2">
+                            <div
+                              :class="[
+                                isParentActive(item.href)
+                                  ? 'bg-yellow-50 text-yellow-600'
+                                  : 'text-gray-700 hover:bg-yellow-50 hover:text-yellow-600',
+                                'group flex gap-x-3 rounded-md p-2 text-sm font-semibold leading-6',
+                                isItemDisabled(item) ? 'opacity-50 cursor-not-allowed' : ''
+                              ]"
+                              @click="!isItemDisabled(item) && navigate()"
+                            >
+                              <component
+                                :is="item.icon"
+                                :class="[
+                                  isParentActive(item.href)
+                                    ? 'text-yellow-600'
+                                    : 'text-gray-400 group-hover:text-yellow-600',
+                                  'h-6 w-6 shrink-0'
+                                ]"
+                                aria-hidden="true"
+                              />
+                              {{ item.name }}
+                              <span v-if="isItemDisabled(item)" class="ml-2 text-xs text-gray-400">(Offline)</span>
+                            </div>
+                          </router-link>
+                          <ul v-if="isParentActive(item.href) && !isItemDisabled(item)" class="mt-1 ml-2 space-y-1">
                             <li v-for="child in item.children" :key="child.name">
                               <router-link
                                 :to="child.href"
@@ -287,7 +294,7 @@
                                   $route.path === child.href
                                     ? 'bg-yellow-50 text-yellow-600'
                                     : 'text-gray-700 hover:bg-yellow-50 hover:text-yellow-600',
-                                  'group flex gap-x-3 rpounded-md p-2 text-sm leading-6'
+                                  'group flex gap-x-3 rounded-md p-2 pl-5 text-sm leading-6'
                                 ]"
                                 @click="closeSidebar"
                               >
@@ -309,12 +316,7 @@
                         <router-link
                           v-else
                           :to="item.href"
-                          :class="[
-                            $route.path === item.href
-                              ? 'bg-yellow-50 text-yellow-600'
-                              : 'text-gray-700 hover:bg-yellow-50 hover:text-yellow-600',
-                            'group flex gap-x-3 rounded-md p-2 text-sm font-semibold leading-6'
-                          ]"
+                          :class="getMenuItemClass(item, $route.path === item.href)"
                           @click="closeSidebar"
                         >
                           <component
@@ -328,6 +330,7 @@
                             aria-hidden="true"
                           />
                           {{ item.name }}
+                          <span v-if="isItemDisabled(item)" class="ml-2 text-xs text-gray-400">(Offline)</span>
                         </router-link>
                       </li>
                     </ul>
@@ -373,19 +376,21 @@ import {
   CurrencyDollarIcon,
   Cog6ToothIcon,
   UsersIcon,
-  KeyIcon
+  KeyIcon,
+  PhoneIcon,
+  ListBulletIcon,
+  CalendarIcon,
+  TagIcon,
+  QueueListIcon
 } from '@heroicons/vue/24/outline'
 import { ChevronDownIcon, MagnifyingGlassIcon } from '@heroicons/vue/20/solid'
 import router from '../router'
 import logo from '../assets/logo.svg'
 import defaultLogo from '../assets/logo.svg'
-import CompanySelector from '@/components/company/CompanySelector.vue'
-import { useCompanyStore } from '@/stores/companyStore'
 
 const sidebarOpen = ref(false)
 const authStore = useAuthStore()
 const settingsStore = useSettingsStore()
-const companyStore = useCompanyStore()
 
 const route = useRoute()
 
@@ -415,7 +420,6 @@ onMounted(async () => {
   try {
     await Promise.all([
       settingsStore.fetchSettings(),
-      companyStore.fetchUserCompanies()
     ])
   } catch (error) {
     console.error('Failed to load initial data:', error)
@@ -433,33 +437,54 @@ const updateOnlineStatus = () => {
 }
 
 const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
-  { name: 'Customers', href: '/customers', icon: UserGroupIcon },
-
-  { name: 'Categories', href: '/categories', icon: BuildingOfficeIcon, requiresOnline: true },
+  { 
+    name: 'Appointments', 
+    href: '/appointments', 
+    icon: CalendarIcon, 
+    requiresOnline: true,
+    requiresPermission: 'view appointments'
+  },
+  { 
+    name: 'Categories', 
+    href: '/categories', 
+    icon: QueueListIcon, 
+    requiresOnline: true,
+    requiresPermission: 'view resources'
+  },
+  { 
+    name: 'Resources', 
+    href: '/resources', 
+    icon: ListBulletIcon, 
+    requiresOnline: true,
+    requiresPermission: 'view resources'
+  },
   { 
     name: 'Settings', 
     href: '/settings',
     requiresOnline: true,
     icon: Cog6ToothIcon,
+    requiresPermission: 'view settings',
     children: [
       { 
         name: 'Users', 
         href: '/settings/users',
         icon: UsersIcon,
-        requiresOnline: true 
+        requiresOnline: true,
+        requiresPermission: 'view users'
       },
       { 
         name: 'Roles & Permissions', 
         href: '/settings/roles',
         icon: KeyIcon,
-        requiresOnline: true 
+        requiresOnline: true,
+        requiresPermission: 'view roles'
       },
       { 
         name: 'Site Settings', 
         href: '/settings/site',
         icon: Cog6ToothIcon,
-        requiresOnline: true 
+        requiresOnline: true,
+        requiresPermission: 'view settings'
       },
     ]
   }
@@ -483,15 +508,27 @@ const closeSidebar = () => {
   sidebarOpen.value = false
 }
 
-// Computed property to determine if a menu item should be disabled
+// Update the isItemDisabled function to check for permissions
 const isItemDisabled = (item) => {
+  // Check for online requirement
   if (item.requiresOnline && !isOnline.value) {
     return true;
   }
-  // If it's a parent with children, check if all children require online
-  if (item.children) {
-    return item.children.every(child => child.requiresOnline) && !isOnline.value;
+  
+  // Check for permission requirement
+  if (item.requiresPermission && !authStore.user?.permissions?.includes(item.requiresPermission)) {
+    return true;
   }
+  
+  // If it's a parent with children, check if all children are disabled
+  if (item.children) {
+    const allChildrenDisabled = item.children.every(child => 
+      (child.requiresOnline && !isOnline.value) || 
+      (child.requiresPermission && !authStore.user?.permissions?.includes(child.requiresPermission))
+    );
+    return allChildrenDisabled;
+  }
+  
   return false;
 }
 
@@ -519,6 +556,14 @@ const userInitials = computed(() => {
   // Otherwise just take the first letter
   return username.charAt(0).toUpperCase();
 });
+
+// Update the template to hide disabled items
+const visibleNavigation = computed(() => {
+  return navigation.filter(item => !isItemDisabled(item))
+})
+
+// Add a debug log to check permissions
+console.log('User Permissions:', authStore.user?.permissions)
 
 </script>
 

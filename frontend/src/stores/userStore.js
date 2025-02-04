@@ -105,6 +105,18 @@ export const useUserStore = defineStore('userStore', {
         return company
       }
       throw new Error('Company not found')
+    },
+
+    async fetchCounselors() {
+      try {
+        const response = await http.get('/api/users', { 
+          params: { user_type: 'counselor' } 
+        })
+        return response.data.data
+      } catch (error) {
+        console.error('Failed to fetch counselors:', error)
+        throw error
+      }
     }
   }
 })

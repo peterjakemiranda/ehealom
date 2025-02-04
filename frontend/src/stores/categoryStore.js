@@ -27,36 +27,14 @@ export const useCategoryStore = defineStore({
   },
 
   actions: {
-    async fetchCategories({ page = 1, search = '', perPage = 10 } = {}) {
+    async fetchCategories() {
       this.isLoading = true;
-      this.error = null;
-
       try {
-        // First get from IndexedDB
-        let categories = await db.categories
-          .orderBy('created_at')
-          .reverse()
-          .toArray();
-
-        if (navigator.onLine) {
-          try {
-            const response = await http.get("/api/categories", {
-              params: { page, search, per_page: perPage }
-            });
-            
-            // Update IndexedDB with server data
-            await db.bulkUpsert('categories', response.data.data);
-            this.categories = response.data.data;
-            this.pagination = response.data.meta;
-          } catch (error) {
-            console.error("Server sync failed:", error);
-            this.categories = categories;
-          }
-        } else {
-          this.categories = categories;
-        }
+        const response = await http.get('/api/categories');
+        this.categories = response.data.data;
+        return this.categories;
       } catch (error) {
-        this.error = error.response?.data?.message || 'An error occurred';
+        handleError(error);
         throw error;
       } finally {
         this.isLoading = false;
@@ -65,7 +43,7 @@ export const useCategoryStore = defineStore({
 
     async searchCategories(search) {
       // Reset to first page when searching
-      return this.fetchCategories({ page: 1, search });
+      return this.fetchCategories();
     },
 
     // Reset pagination state
@@ -91,118 +69,61 @@ export const useCategoryStore = defineStore({
     },
 
     async addCategory(category) {
+      this.isLoading = true;
       try {
-        const categoryData = {
-          ...category,
-          uuid: category.uuid || crypto.randomUUID(),
-          localId: category.localId || Date.now(),
-          sync_status: 'pending',
-          created_at: category.created_at || new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-
-        // Save to IndexedDB first
-        await db.categories.put(categoryData);
-        
-        // Update local list immediately
-        this.categories = [categoryData, ...this.categories];
-
-        if (navigator.onLine) {
-          try {
-            // Direct server sync
-            const response = await http.post("/api/categories", categoryData);
-            const serverCategory = response.data.data;
-            
-            // Update local DB with server response
-            await db.categories.put({
-              ...categoryData,
-              ...serverCategory,
-              sync_status: 'synced'
-            });
-            
-            // Refresh the list to show updated data
-            await this.fetchCategories();
-          } catch (error) {
-            console.error("Server sync failed:", error);
-            // Only queue for sync if server sync fails
-            await syncService.queueForSync({
-              type: 'CREATE_CATEGORY',
-              data: categoryData
-            });
+        const formData = new FormData();
+        Object.keys(category).forEach(key => {
+          if (key === 'image' && category[key]) {
+            formData.append('image', category[key]);
+          } else {
+            formData.append(key, category[key]);
           }
-        } else {
-          // Queue for later sync if offline
-          await syncService.queueForSync({
-            type: 'CREATE_CATEGORY',
-            data: categoryData
-          });
-        }
+        });
 
-        handleSuccess("Category created successfully");
-        return categoryData;
+        const response = await http.post('/api/categories', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        
+        this.categories.push(response.data.data);
+        handleSuccess('Category created successfully');
+        return response.data.data;
       } catch (error) {
-        console.error('Error adding category:', error);
         handleError(error);
         throw error;
+      } finally {
+        this.isLoading = false;
       }
     },
 
     async updateCategory(uuid, category) {
+      this.isLoading = true;
       try {
-        const existingCategory = await db.findByUuid('categories', uuid);
-        if (!existingCategory) throw new Error('Category not found');
+        const formData = new FormData();
+        Object.keys(category).forEach(key => {
+          if (key === 'image' && category[key]) {
+            formData.append('image', category[key]);
+          } else if (key !== 'uuid') {
+            formData.append(key, category[key]);
+          }
+        });
+        formData.append('_method', 'PUT');
 
-        // Update local DB first
-        const updatedCategory = await db.updateWithSync('categories', uuid, {
-          ...category,
-          sync_status: 'pending'
+        const response = await http.post(`/api/categories/${uuid}`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
         });
 
-        // Update store immediately
         const index = this.categories.findIndex(c => c.uuid === uuid);
         if (index !== -1) {
-          this.categories = [
-            ...this.categories.slice(0, index),
-            updatedCategory,
-            ...this.categories.slice(index + 1)
-          ];
+          this.categories[index] = response.data.data;
         }
 
-        if (navigator.onLine) {
-          try {
-            // Direct server sync
-            const response = await http.put(`/api/categories/${uuid}`, category);
-            const serverCategory = response.data.data;
-            
-            // Update local DB with server response
-            await db.updateWithSync('categories', uuid, {
-              ...serverCategory,
-              sync_status: 'synced'
-            }, false);
-            
-            // Refresh the list to show updated data
-            await this.fetchCategories();
-          } catch (error) {
-            console.error("Server sync failed:", error);
-            // Only queue for sync if server sync fails
-            await syncService.queueForSync({
-              type: 'UPDATE_CATEGORY',
-              data: { uuid, ...category }
-            });
-          }
-        } else {
-          // Queue for later sync if offline
-          await syncService.queueForSync({
-            type: 'UPDATE_CATEGORY',
-            data: { uuid, ...category }
-          });
-        }
-
-        handleSuccess("Category updated successfully");
-        return updatedCategory;
+        handleSuccess('Category updated successfully');
+        return response.data.data;
       } catch (error) {
         handleError(error);
         throw error;
+      } finally {
+        this.isLoading = false;
       }
     }
   }
