@@ -22,37 +22,36 @@ class UserController extends Controller
 
     public function index(Request $request)
     {
-        $users = QueryBuilder::for(User::class)
-            ->allowedFilters([
-                AllowedFilter::callback('search', function ($query, $value) {
-                    $query->where(function ($q) use ($value) {
-                        $q->where('name', 'like', "%{$value}%")
-                          ->orWhere('email', 'like', "%{$value}%");
-                    });
-                }),
-                AllowedFilter::callback('user_type', function ($query, $value) {
-                    // Map user_type to role name
-                    $roleMap = [
-                        'student' => 'student',
-                        'counselor' => 'counselor',
-                        'personnel' => 'personnel'
-                    ];
-                    
-                    if (isset($roleMap[$value])) {
-                        $query->whereHas('roles', function($q) use ($roleMap, $value) {
-                            $q->where('name', $roleMap[$value]);
-                        });
-                        if ($value === 'counselor') {
-                            $query->has('roles', '=', 1);
-                        }
-                    }
-                }),
-                AllowedFilter::exact('status'),
-            ])
-            ->with('roles')
-            ->defaultSort('-created_at')
-            ->paginate($request->input('per_page', 10));
+        $query = User::with('roles');
 
+        // Handle search
+        if ($request->has('search')) {
+            $searchTerm = $request->input('search');
+            $query->where(function($q) use ($searchTerm) {
+                $q->where('name', 'like', "%{$searchTerm}%")
+                  ->orWhere('email', 'like', "%{$searchTerm}%");
+            });
+        }
+
+        // Handle user type filter
+        if ($request->has('user_type')) {
+            $userType = $request->input('user_type');
+            
+            $query->whereHas('roles', function($q) use ($userType) {
+                $q->where('name', $userType);
+            });
+        }
+
+        // Handle status filter
+        if ($request->has('status')) {
+            $query->where('status', $request->input('status'));
+        }
+
+        // Sort by created date descending by default
+        $query->orderBy('created_at', 'desc');
+
+        $users = $query->paginate($request->input('per_page', 10));
+        
         return UserResource::collection($users);
     }
 

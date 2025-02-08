@@ -125,9 +125,11 @@ class _ProfileViewState extends State<ProfileView> {
     }
 
     return AppScaffold(
-      title: 'My Account',
-      currentIndex: -1,
-      body: SingleChildScrollView(
+      title: const Text('My Account'),
+      currentIndex: 3,
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Form(
           key: _formKey,

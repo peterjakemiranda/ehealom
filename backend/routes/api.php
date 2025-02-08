@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\FirstAidController;
 use App\Http\Controllers\Api\AlertController;
 use App\Http\Controllers\Api\ResourceController;
 use App\Http\Controllers\Api\AppointmentController;
+use App\Http\Controllers\Api\CounselorScheduleController;
 
 /*
 |--------------------------------------------------------------------------
@@ -75,24 +76,18 @@ Route::middleware(['auth:sanctum'])->group(function () {
             ->middleware('permission:manage resources');
     });
 
-    // Appointment routes with permissions
-    Route::prefix('appointments')->group(function () {
-        Route::get('/', [AppointmentController::class, 'index'])
-            ->middleware('permission:view appointments');
-        
-        Route::post('/', [AppointmentController::class, 'store'])
-            ->middleware('permission:manage appointments');
-        
-        Route::get('/available-slots', [AppointmentController::class, 'availableSlots'])
-            ->middleware('permission:view appointments');
-        
-        Route::put('/{appointment}/status', [AppointmentController::class, 'updateStatus'])
-            ->middleware('permission:manage appointments');
-        
-        Route::get('/{appointment}', [AppointmentController::class, 'show'])
-            ->middleware('permission:view appointments');
-        
-        Route::put('/{appointment}', [AppointmentController::class, 'update'])
-            ->middleware('permission:manage appointments');
+    // Appointment routes
+    Route::get('/appointments/counts', [AppointmentController::class, 'getCounts']);
+    Route::get('/appointments/available-slots', [AppointmentController::class, 'getAvailableSlots']);
+    Route::apiResource('appointments', AppointmentController::class)->parameters([
+        'appointments' => 'appointment:uuid'
+    ]);
+    
+    // Counselor Schedule routes
+    Route::prefix('counselor')->middleware('role:counselor')->group(function () {
+        Route::get('schedule', [CounselorScheduleController::class, 'getSchedule']);
+        Route::post('schedule', [CounselorScheduleController::class, 'updateSchedule']);
+        Route::post('excluded-dates', [CounselorScheduleController::class, 'updateExcludedDates']);
+        Route::delete('excluded-dates/{id}', [CounselorScheduleController::class, 'deleteExcludedDate']);
     });
 });

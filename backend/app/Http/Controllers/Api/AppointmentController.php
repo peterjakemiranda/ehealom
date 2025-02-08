@@ -8,9 +8,18 @@ use Illuminate\Http\Request;
 use App\Http\Resources\AppointmentResource;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
+use App\Services\AppointmentScheduleService;
+use App\Models\User;
 
 class AppointmentController extends Controller
 {
+    protected $scheduleService;
+
+    public function __construct(AppointmentScheduleService $scheduleService)
+    {
+        $this->scheduleService = $scheduleService;
+    }
+
     // Time slot interval in minutes (can be moved to settings later)
     const TIME_SLOT_INTERVAL = 30;
     const START_TIME = '09:00';
@@ -21,18 +30,33 @@ class AppointmentController extends Controller
         $query = Appointment::query()
             ->with(['student', 'counselor']);
 
+        // Filter by user role
         if ($request->user()->hasRole('student')) {
             $query->where('student_id', $request->user()->id);
         } elseif ($request->user()->hasRole('counselor')) {
             $query->where('counselor_id', $request->user()->id);
         }
 
-        if ($request->has('status') && $request->get('status')) {
-            $query->where('status', $request->status);
-        }
-
-        if ($request->has('date') && $request->get('date')) {
-            $query->whereDate('appointment_date', $request->date);
+        // Apply status/date filters
+        $now = now();
+        switch ($request->get('status')) {
+            case 'upcoming':
+                $query->where('status', 'confirmed')
+                    ->whereDate('appointment_date', '>=', $now);
+                break;
+            case 'pending':
+                $query->where('status', 'pending');
+                break;
+            case 'past':
+                $query->where('status', 'completed')
+                ->orWhere(function($q) use ($now) {
+                    $q->whereDate('appointment_date', '<', $now)
+                        ->where('status', 'confirmed');
+                });
+                break;
+            case 'cancelled':
+                $query->where('status', 'cancelled');
+                break;
         }
 
         $appointments = $query->orderBy('appointment_date', 'desc')
@@ -45,94 +69,92 @@ class AppointmentController extends Controller
     {
         $validated = $request->validate([
             'counselor_id' => 'required|exists:users,id',
-            'date' => 'required|date|after_or_equal:today',
-            'current_appointment_id' => 'nullable|exists:appointments,id'
+            'date' => [
+                'required',
+                'date',
+                'date_format:Y-m-d',
+                function ($attribute, $value, $fail) {
+                    $selectedDate = \Carbon\Carbon::parse($value)->startOfDay();
+                    $today = now()->startOfDay();
+                    
+                    if ($selectedDate->lt($today)) {
+                        $fail('The selected date must not be in the past.');
+                    }
+                },
+            ],
         ]);
 
-        // Parse date in UTC
-        $date = Carbon::parse($validated['date'])->startOfDay()->utc();
-        $startTime = Carbon::parse($date->format('Y-m-d') . ' ' . self::START_TIME)->utc();
-        $endTime = Carbon::parse($date->format('Y-m-d') . ' ' . self::END_TIME)->utc();
-
-        // Get booked appointments for the date
-        $query = Appointment::where('counselor_id', $validated['counselor_id'])
-            ->whereDate('appointment_date', $date)
-            ->whereIn('status', ['pending', 'confirmed']);
-
-        if (!empty($validated['current_appointment_id'])) {
-            $query->where('id', '!=', $validated['current_appointment_id']);
-        }
-
-        $bookedSlots = $query->pluck('appointment_date')
-            ->map(function($slot) {
-                return Carbon::parse($slot)->utc()->format('H:i');
-            })
-            ->toArray();
-
-        // Generate available time slots
-        $slots = [];
-        $current = clone $startTime;
-
-        while ($current <= $endTime) {
-            $timeSlot = $current->format('H:i');
-            $isBooked = in_array($timeSlot, $bookedSlots);
-
-            $slots[] = [
-                'time' => $timeSlot,
-                'display_time' => $current->copy()->setTimezone($request->header('Time-Zone', 'UTC'))->format('g:i A'),
-                'available' => !$isBooked
-            ];
-
-            $current->addMinutes(self::TIME_SLOT_INTERVAL);
-        }
+        $slots = $this->scheduleService->getAvailableSlots(
+            $validated['counselor_id'],
+            $validated['date']
+        );
 
         return response()->json([
-            'data' => [
-                'slots' => $slots,
-                'date' => $date->format('Y-m-d'),
-                'counselor_id' => $validated['counselor_id']
-            ]
+            'slots' => $slots
         ]);
     }
 
     public function store(Request $request)
     {
+        \Log::info('Appointment creation attempt', [
+            'user' => auth()->user(),
+            'roles' => auth()->user()->roles->pluck('name'),
+            'data' => $request->all()
+        ]);
+
         $validated = $request->validate([
             'counselor_id' => 'required|exists:users,id',
             'appointment_date' => 'required|date|after:now',
             'reason' => 'required|string',
+            'location_type' => 'required|in:online,on-site',
+            'location' => 'required_if:location_type,on-site|nullable|string',
         ]);
 
-        // Parse appointment date as UTC
-        $appointmentDate = Carbon::parse($validated['appointment_date'])->utc();
-        
-        // Check if slot is still available
-        $isSlotTaken = Appointment::where('counselor_id', $validated['counselor_id'])
-            ->whereDate('appointment_date', $appointmentDate)
-            ->whereTime('appointment_date', $appointmentDate->format('H:i:s'))
-            ->whereIn('status', ['pending', 'confirmed'])
-            ->exists();
+        // Check if user is a student
+        if (!auth()->user()->hasRole('student')) {
+            return response()->json([
+                'message' => 'Only students can book appointments'
+            ], 403);
+        }
 
-        if ($isSlotTaken) {
+        // Check if slot is available
+        $appointmentDate = Carbon::parse($validated['appointment_date']);
+        $existingAppointment = Appointment::where('counselor_id', $validated['counselor_id'])
+            ->whereDate('appointment_date', $appointmentDate->toDateString())
+            ->whereTime('appointment_date', $appointmentDate->format('H:i:s'))
+            ->first();
+
+        if ($existingAppointment) {
             return response()->json([
                 'message' => 'This time slot is no longer available'
             ], 422);
         }
 
+        // Create appointment
         $appointment = Appointment::create([
-            'uuid' => Str::uuid(),
-            'student_id' => $request->user()->id,
+            'student_id' => auth()->id(),
             'counselor_id' => $validated['counselor_id'],
-            'appointment_date' => $appointmentDate,
+            'appointment_date' => $validated['appointment_date'],
             'reason' => $validated['reason'],
-            'status' => 'pending'
+            'location_type' => $validated['location_type'],
+            'location' => $validated['location'],
+            'status' => 'pending',
         ]);
 
-        return new AppointmentResource($appointment->load(['student', 'counselor']));
+        return new AppointmentResource($appointment);
     }
 
+    /**
+     * Update the specified appointment.
+     */
     public function update(Request $request, Appointment $appointment)
     {
+        // Log the appointment for debugging
+        \Log::info('Updating appointment:', [
+            'uuid' => $appointment->uuid,
+            'data' => $request->all()
+        ]);
+
         // Validate user can update this appointment
         if ($request->user()->hasRole('student') && $appointment->student_id !== $request->user()->id) {
             abort(403, 'Unauthorized to update this appointment');
@@ -142,61 +164,13 @@ class AppointmentController extends Controller
         }
 
         $validated = $request->validate([
-            'counselor_id' => 'sometimes|exists:users,id',
-            'appointment_date' => 'sometimes|date|after:now',
-            'reason' => 'sometimes|string',
-            'status' => [
-                'sometimes',
-                'string',
-                function ($attribute, $value, $fail) use ($request, $appointment) {
-                    // Status transition rules
-                    $allowedTransitions = [
-                        'student' => [
-                            'pending' => ['cancelled'],
-                            'confirmed' => ['cancelled']
-                        ],
-                        'counselor' => [
-                            'pending' => ['pending', 'confirmed', 'cancelled'],
-                            'confirmed' => ['confirmed', 'completed', 'cancelled']
-                        ]
-                    ];
-
-                    $userType = $request->user()->hasRole('student') ? 'student' : 'counselor';
-                    $currentStatus = $appointment->status;
-
-                    if (!isset($allowedTransitions[$userType][$currentStatus]) ||
-                        !in_array($value, $allowedTransitions[$userType][$currentStatus])) {
-                        $fail('Invalid status transition.');
-                    }
-                }
-            ],
-            'notes' => 'nullable|string',
+            'status' => ['sometimes', 'required', 'in:pending,confirmed,cancelled,completed'],
+            'notes' => ['sometimes', 'nullable', 'string'],
         ]);
-
-        // Check if slot is still available when changing appointment date
-        if (isset($validated['appointment_date'])) {
-            $appointmentDate = Carbon::parse($validated['appointment_date']);
-            $validated['appointment_date'] = $appointmentDate;
-            
-            if ($appointmentDate->format('Y-m-d H:i') !== Carbon::parse($appointment->appointment_date)->format('Y-m-d H:i')) {
-                $isSlotTaken = Appointment::where('counselor_id', $validated['counselor_id'] ?? $appointment->counselor_id)
-                    ->whereDate('appointment_date', $appointmentDate)
-                    ->whereTime('appointment_date', $appointmentDate->format('H:i:s'))
-                    ->whereIn('status', ['pending', 'confirmed'])
-                    ->where('id', '!=', $appointment->id)
-                    ->exists();
-
-                if ($isSlotTaken) {
-                    return response()->json([
-                        'message' => 'This time slot is no longer available'
-                    ], 422);
-                }
-            }
-        }
 
         $appointment->update($validated);
 
-        return new AppointmentResource($appointment->load(['student', 'counselor']));
+        return new AppointmentResource($appointment->fresh());
     }
 
     /**
@@ -214,5 +188,80 @@ class AppointmentController extends Controller
         }
 
         return new AppointmentResource($appointment->load(['student', 'counselor']));
+    }
+
+    public function getCounts(Request $request)
+    {
+        $query = Appointment::query();
+        $user = $request->user();
+
+        // Filter by user role
+        if ($user->hasRole('student')) {
+            $query->where('student_id', $user->id);
+        } elseif ($user->hasRole('counselor')) {
+            $query->where('counselor_id', $user->id);
+        }
+
+        $now = now();
+        
+        $counts = [
+            'upcoming' => (clone $query)
+                ->where('status', 'confirmed')
+                ->whereDate('appointment_date', '>=', $now)
+                ->count(),
+            'pending' => (clone $query)
+                ->where('status', 'pending')
+                ->count(),
+            'past' => (clone $query)
+                ->where(function($q) use ($now) {
+                    $q->where('status', 'completed')
+                        ->orWhere(function($q) use ($now) {
+                            $q->whereDate('appointment_date', '<', $now)
+                                ->where('status', 'confirmed');
+                        });
+                })
+                ->count(),
+            'cancelled' => (clone $query)
+                ->where('status', 'cancelled')
+                ->count(),
+        ];
+
+        return response()->json($counts);
+    }
+
+    public function getAvailableSlots(Request $request)
+    {
+        $request->validate([
+            'counselor_id' => 'required|exists:users,id',
+            'date' => 'required|date|after_or_equal:today',
+        ]);
+
+        $counselor = User::findOrFail($request->counselor_id);
+        if (!$counselor->hasRole('counselor')) {
+            return response()->json([
+                'message' => 'Selected user is not a counselor'
+            ], 422);
+        }
+
+        $date = Carbon::parse($request->date);
+        
+        // Get all slots
+        $slots = ['09:00', '10:00', '11:00', '13:00', '14:00', '15:00', '16:00'];
+        
+        // Get booked slots
+        $bookedSlots = Appointment::where('counselor_id', $request->counselor_id)
+            ->whereDate('appointment_date', $date)
+            ->pluck('appointment_date')
+            ->map(function($datetime) {
+                return Carbon::parse($datetime)->format('H:i');
+            })
+            ->toArray();
+        
+        // Remove booked slots
+        $availableSlots = array_values(array_diff($slots, $bookedSlots));
+
+        return response()->json([
+            'slots' => $availableSlots
+        ]);
     }
 } 

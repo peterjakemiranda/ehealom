@@ -6,10 +6,12 @@ import 'app_scaffold.dart';
 
 class BottomNavBar extends StatelessWidget {
   final int currentIndex;
+  final Function(int)? onTap;
 
   const BottomNavBar({
     Key? key,
     required this.currentIndex,
+    this.onTap,
   }) : super(key: key);
 
   @override
@@ -34,7 +36,13 @@ class BottomNavBar extends StatelessWidget {
           label: 'Resources',
         ),
       ],
-      onTap: (index) => _onNavigationTap(context, index),
+      onTap: (index) {
+        if (onTap != null) {
+          onTap!(index);
+        } else {
+          _onNavigationTap(context, index);
+        }
+      },
     );
   }
 

@@ -7,6 +7,7 @@ import '../../services/resource_service.dart';
 import '../../controllers/auth_controller.dart';
 import '../../widgets/app_scaffold.dart';
 import '../resources/resource_details_view.dart';
+import 'dart:convert';
 
 class HomeView extends StatefulWidget {
   static const routeName = '/home';
@@ -31,6 +32,9 @@ class _HomeViewState extends State<HomeView> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final user = context.read<AuthController>().user;
       debugPrint('HomeView - User data: $user');
+      
+      // Add listener for auth state changes
+      context.read<AuthController>().addListener(_handleAuthStateChange);
     });
     _loadData();
   }
@@ -38,8 +42,35 @@ class _HomeViewState extends State<HomeView> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final user = context.read<AuthController>().user;
+    final authController = context.read<AuthController>();
+    
+    if (!authController.isAuthenticated && !authController.isLoading) {
+      debugPrint('User not authenticated, redirecting to login');
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.of(context).pushReplacementNamed('/login');
+      });
+      return;
+    }
+    
+    final user = authController.user;
     debugPrint('HomeView - didChangeDependencies - User data: $user');
+  }
+
+  @override
+  void dispose() {
+    // Remove listener when disposing
+    context.read<AuthController>().removeListener(_handleAuthStateChange);
+    super.dispose();
+  }
+
+  void _handleAuthStateChange() {
+    final authController = context.read<AuthController>();
+    if (!authController.isAuthenticated && !authController.isLoading) {
+      debugPrint('User logged out, redirecting to login');
+      if (mounted) {
+        Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+      }
+    }
   }
 
   Future<void> _loadData() async {
@@ -48,22 +79,62 @@ class _HomeViewState extends State<HomeView> {
       final appointmentsResult = await _appointmentService.fetchAppointments(
         perPage: 5,
         page: 1,
+        upcoming: true,
       );
       
       final resourcesResult = await _resourceService.fetchResources(
         perPage: 3,
       );
 
+      debugPrint('Appointments Result: ${jsonEncode(appointmentsResult)}');
+      debugPrint('Resources Result: ${jsonEncode(resourcesResult)}');
+
+      final appointmentsList = appointmentsResult['data'] as List?;
+      final resourcesList = resourcesResult['data'] as List?;
+
+      debugPrint('Appointments List Length: ${appointmentsList?.length}');
+      debugPrint('Resources List Length: ${resourcesList?.length}');
+
       setState(() {
-        _upcomingAppointments = appointmentsResult['appointments'];
-        _relatedResources = resourcesResult['resources'];
+        _upcomingAppointments = (appointmentsList ?? [])
+            .map((item) {
+              debugPrint('Processing appointment item: $item');
+              return Appointment.fromJson(item as Map<String, dynamic>);
+            })
+            .toList();
+
+        _relatedResources = (resourcesList ?? [])
+            .map((item) {
+              debugPrint('Processing resource item: $item');
+              return Resource.fromJson(item as Map<String, dynamic>);
+            })
+            .toList();
+        
+        debugPrint('Processed Appointments Count: ${_upcomingAppointments.length}');
+        debugPrint('Processed Resources Count: ${_relatedResources.length}');
+        
         _isLoading = false;
       });
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error in _loadData: $e');
+      debugPrint('❌ Stack trace: $stackTrace');
       setState(() {
         _error = e.toString();
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _createAppointment() async {
+    final result = await Navigator.pushNamed(
+      context,
+      '/appointments/create',
+    );
+    
+    if (result == true) {
+      // Refresh data when returning from appointment creation
+      debugPrint('🔄 Refreshing home data after appointment creation');
+      await _loadData();
     }
   }
 
@@ -73,7 +144,16 @@ class _HomeViewState extends State<HomeView> {
     final userName = user?['user']?['name']?.split(' ')[0] ?? 'there';
 
     return AppScaffold(
-      title: '',
+      title: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Image.asset(
+            'assets/images/logo.png',
+            height: 30,
+            fit: BoxFit.contain,
+          ),
+        ],
+      ),
       currentIndex: 0,
       hideBackButton: true,
       body: _isLoading
@@ -145,15 +225,10 @@ class _HomeViewState extends State<HomeView> {
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                     const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: () => Navigator.pushNamed(
-                        context,
-                        '/appointments/create',
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                      child: const Text('Book Now'),
+                    ElevatedButton.icon(
+                      onPressed: _createAppointment,
+                      icon: const Icon(Icons.add),
+                      label: const Text('Book Appointment'),
                     ),
                   ],
                 ),
@@ -167,6 +242,8 @@ class _HomeViewState extends State<HomeView> {
 
   Widget _buildUpcomingAppointment() {
     final nextAppointment = _upcomingAppointments.first;
+    final isPending = nextAppointment.status.toLowerCase() == 'pending';
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
       child: Column(
@@ -214,72 +291,84 @@ class _HomeViewState extends State<HomeView> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              nextAppointment.counselor?['name'] ?? 'Your Counselor',
+                              nextAppointment.counselor?['name'] ?? 'Counselor',
                               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
+                            const SizedBox(height: 4),
                             Text(
-                              'Therapist',
+                              'Counselor',
                               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7),
+                                color: Colors.grey[600],
                               ),
                             ),
                           ],
                         ),
                       ),
-                      IconButton(
-                        icon: Icon(
-                          Icons.more_horiz,
-                          color: Theme.of(context).primaryColor,
-                        ),
-                        onPressed: () {
-                          // Show appointment details
-                        },
-                      ),
                     ],
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 16),
                   Row(
                     children: [
-                      Icon(
-                        Icons.calendar_today,
-                        color: Theme.of(context).primaryColor,
-                        size: 20,
-                      ),
+                      const Icon(Icons.calendar_today, size: 20),
                       const SizedBox(width: 8),
                       Text(
-                        _formatAppointmentDate(nextAppointment.appointmentDate),
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                      const SizedBox(width: 16),
-                      Icon(
-                        Icons.access_time,
-                        color: Theme.of(context).primaryColor,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        _formatAppointmentTime(nextAppointment.appointmentDate),
-                        style: Theme.of(context).textTheme.bodyMedium,
+                        _formatDate(nextAppointment.appointmentDate),
+                        style: Theme.of(context).textTheme.bodyLarge,
                       ),
                     ],
                   ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(Icons.location_on, size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        nextAppointment.locationType == 'online'
+                            ? 'Online'
+                            : nextAppointment.location ?? 'On-site',
+                        style: Theme.of(context).textTheme.bodyLarge,
+                      ),
+                    ],
+                  ),
+                  if (isPending) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFA726).withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: const Color(0xFFFFA726),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.pending_outlined,
+                            size: 16,
+                            color: const Color(0xFFFFA726),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Pending Confirmation',
+                            style: TextStyle(
+                              color: const Color(0xFFFFA726),
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Center(
-            child: TextButton.icon(
-              onPressed: () => Navigator.pushNamed(
-                context,
-                '/appointments/create',
-              ),
-              icon: const Icon(Icons.add),
-              label: const Text('Book another appointment'),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               ),
             ),
           ),
@@ -288,19 +377,12 @@ class _HomeViewState extends State<HomeView> {
     );
   }
 
-  String _formatAppointmentDate(DateTime date) {
+  String _formatDate(DateTime date) {
     final months = [
       'January', 'February', 'March', 'April', 'May', 'June',
       'July', 'August', 'September', 'October', 'November', 'December'
     ];
     return '${months[date.month - 1]} ${date.day}';
-  }
-
-  String _formatAppointmentTime(DateTime date) {
-    final hour = date.hour > 12 ? date.hour - 12 : date.hour;
-    final period = date.hour >= 12 ? 'PM' : 'AM';
-    final endHour = (date.hour + 1) > 12 ? (date.hour + 1) - 12 : (date.hour + 1);
-    return '$hour:00 - $endHour:00 $period';
   }
 
   Widget _buildWellnessResources() {
@@ -328,9 +410,9 @@ class _HomeViewState extends State<HomeView> {
             physics: const NeverScrollableScrollPhysics(),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              childAspectRatio: 0.8,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              mainAxisExtent: 240,
             ),
             itemCount: _relatedResources.length,
             itemBuilder: (context, index) {
@@ -344,52 +426,73 @@ class _HomeViewState extends State<HomeView> {
   }
 
   Widget _buildResourceCard(Resource resource) {
-    return GestureDetector(
-      onTap: () => Navigator.pushNamed(
-        context,
-        ResourceDetailsView.routeName,
-        arguments: resource.uuid,
-      ),
-      child: Container(
-        decoration: BoxDecoration(
-          color: _getResourceColor(resource.category),
-          borderRadius: BorderRadius.circular(16),
-        ),
+    final categoryTitle = resource.categories.isNotEmpty 
+        ? resource.categories.first['title'].toLowerCase()
+        : 'general';
+
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      elevation: 2,
+      child: InkWell(
+        onTap: () {
+          debugPrint('Navigating to resource: ${resource.uuid}');
+          Navigator.pushNamed(
+            context,
+            ResourceDetailsView.routeName,
+            arguments: resource.uuid,
+          );
+        },
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: Center(
+            if (resource.imageUrl != null)
+              Image.network(
+                resource.imageUrl!,
+                height: 120,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  height: 120,
+                  color: Colors.grey[200],
+                  child: Icon(
+                    Icons.image_not_supported,
+                    color: Colors.grey[400],
+                  ),
+                ),
+              )
+            else
+              Container(
+                height: 120,
+                color: _getResourceColor(categoryTitle),
                 child: Icon(
-                  _getResourceIcon(resource.category),
-                  size: 48,
+                  _getResourceIcon(categoryTitle),
                   color: Theme.of(context).primaryColor,
+                  size: 32,
                 ),
               ),
-            ),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    resource.title,
-                    style: Theme.of(context).textTheme.titleMedium,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    resource.content,
-                    style: Theme.of(context).textTheme.bodySmall,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      resource.title,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      resource.content,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
               ),
             ),
           ],

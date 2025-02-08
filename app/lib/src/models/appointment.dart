@@ -2,45 +2,54 @@ class Appointment {
   final String id;
   final String uuid;
   final String studentId;
-  final String counselorId;
+  final Map<String, dynamic>? counselor;
   final DateTime appointmentDate;
   final String status;
   final String reason;
-  final String? notes;
   final String locationType;
   final String? location;
-  final Map<String, dynamic>? counselor;
+  final String? notes;
   final Map<String, dynamic>? student;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
 
   Appointment({
     required this.id,
     required this.uuid,
     required this.studentId,
-    required this.counselorId,
+    this.counselor,
     required this.appointmentDate,
     required this.status,
     required this.reason,
-    this.notes,
     required this.locationType,
     this.location,
-    this.counselor,
+    this.notes,
     this.student,
+    this.createdAt,
+    this.updatedAt,
   });
 
   factory Appointment.fromJson(Map<String, dynamic> json) {
     return Appointment(
-      id: json['id'].toString(),
-      uuid: json['uuid'],
-      studentId: json['student_id'].toString(),
-      counselorId: json['counselor_id'].toString(),
-      appointmentDate: DateTime.parse(json['appointment_date']),
-      status: json['status'],
-      reason: json['reason'],
-      notes: json['notes'],
-      locationType: json['location_type'] ?? 'online',
-      location: json['location'],
-      counselor: json['counselor'],
-      student: json['student'],
+      id: json['id']?.toString() ?? '',
+      uuid: json['uuid']?.toString() ?? '',
+      studentId: json['student_id']?.toString() ?? '',
+      counselor: json['counselor'] as Map<String, dynamic>?,
+      appointmentDate: json['appointment_date'] != null 
+          ? DateTime.parse(json['appointment_date']) 
+          : DateTime.now(),
+      status: json['status']?.toString() ?? 'pending',
+      reason: json['reason']?.toString() ?? '',
+      locationType: json['location_type']?.toString() ?? 'online',
+      location: json['location']?.toString(),
+      notes: json['notes']?.toString(),
+      student: json['student'] as Map<String, dynamic>?,
+      createdAt: json['created_at'] != null 
+          ? DateTime.parse(json['created_at']) 
+          : null,
+      updatedAt: json['updated_at'] != null 
+          ? DateTime.parse(json['updated_at']) 
+          : null,
     );
   }
 } 

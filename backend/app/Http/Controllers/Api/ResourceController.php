@@ -13,29 +13,23 @@ class ResourceController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Resource::query()
-            ->with(['creator', 'categories']);
+        $query = Resource::with('categories')
+            ->when($request->has('category'), function ($query) use ($request) {
+                $query->whereHas('categories', function ($q) use ($request) {
+                    $q->where('uuid', $request->category);
+                });
+            })
+            ->when($request->has('search'), function ($query) use ($request) {
+                $search = $request->search;
+                $query->where(function($q) use ($search) {
+                    $q->where('title', 'like', "%{$search}%")
+                      ->orWhere('content', 'like', "%{$search}%");
+                });
+            })
+            ->orderBy('created_at', 'desc');
 
-        if ($request->has('category')) {
-            $query->whereHas('categories', function($q) use ($request) {
-                $q->where('categories.id', $request->category);
-            });
-        }
-
-        if ($request->has('search')) {
-            $search = $request->search;
-            $query->where(function($q) use ($search) {
-                $q->where('title', 'like', "%{$search}%")
-                  ->orWhere('content', 'like', "%{$search}%");
-            });
-        }
-
-        if (!$request->user()->tokenCan('admin')) {
-            $query->where('is_published', true);
-        }
-
-        $resources = $query->orderByDesc('created_at')
-            ->paginate($request->input('per_page', 10));
+        $perPage = $request->input('per_page', 10);
+        $resources = $query->paginate($perPage);
 
         return ResourceResource::collection($resources);
     }
@@ -82,11 +76,12 @@ class ResourceController extends Controller
 
     public function show(Resource $resource)
     {
-        if (!$resource->is_published && !request()->user()->tokenCan('admin')) {
-            abort(403, 'Unauthorized access to unpublished resource');
+        // Check if the resource is published or if user has permission to view unpublished
+        if (!$resource->is_published && !auth()->user()->can('manage resources')) {
+            return response()->json(['message' => 'Resource not found'], 404);
         }
 
-        return new ResourceResource($resource->load('creator'));
+        return new ResourceResource($resource);
     }
 
     public function update(Request $request, Resource $resource)

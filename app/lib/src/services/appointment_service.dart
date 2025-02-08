@@ -44,8 +44,7 @@ class AppointmentService {
         queryParameters: queryParams,
       );
 
-      // Debug log
-      debugPrint('🌐 Fetching appointments: $url');
+      debugPrint('🌐 Fetching appointments URL: $url');
 
       final response = await _client.get(
         url,
@@ -55,16 +54,13 @@ class AppointmentService {
         },
       );
 
-      // Debug log
-      debugPrint('📥 Response status: ${response.statusCode}');
-      debugPrint('📥 Response body: ${response.body}');
+      debugPrint('📥 Appointments Response Status: ${response.statusCode}');
+      debugPrint('📥 Appointments Response Body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         return {
-          'appointments': (data['data'] as List)
-              .map((json) => Appointment.fromJson(json))
-              .toList(),
+          'data': data['data'] as List,
           'meta': data['meta'],
         };
       } else {
@@ -76,11 +72,13 @@ class AppointmentService {
     }
   }
 
-  Future<Appointment> createAppointment(Map<String, dynamic> appointment) async {
+  Future<void> createAppointment(Map<String, dynamic> data) async {
     try {
+      debugPrint('📤 Creating appointment with data: $data');
       final token = await _authService.getToken();
       if (token == null) throw Exception('No authentication token found');
 
+      debugPrint('🔑 Using token: $token');
       final response = await _client.post(
         Uri.parse('${ApiConfig.baseUrl}/appointments'),
         headers: {
@@ -88,16 +86,19 @@ class AppointmentService {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
-        body: jsonEncode(appointment),
+        body: jsonEncode(data),
       );
 
-      if (response.statusCode == 201) {
-        final data = jsonDecode(response.body);
-        return Appointment.fromJson(data['data']);
-      } else {
-        throw Exception('Failed to create appointment: ${response.statusCode}');
+      debugPrint('📥 Create Appointment Response Status: ${response.statusCode}');
+      debugPrint('📥 Create Appointment Response Body: ${response.body}');
+
+      if (response.statusCode != 201) {
+        final error = jsonDecode(response.body);
+        throw Exception(error['message'] ?? 'Failed to create appointment');
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error creating appointment: $e');
+      debugPrint('❌ Stack trace: $stackTrace');
       rethrow;
     }
   }
@@ -128,11 +129,12 @@ class AppointmentService {
     }
   }
 
-  Future<List<Map<String, dynamic>>> fetchAvailableSlots({
+  Future<List<String>> fetchAvailableSlots({
     required String counselorId,
     required String date,
   }) async {
     try {
+      debugPrint('🔍 Fetching time slots for counselor: $counselorId, date: $date');
       final token = await _authService.getToken();
       if (token == null) throw Exception('No authentication token found');
 
@@ -149,19 +151,25 @@ class AppointmentService {
         },
       );
 
+      debugPrint('📥 Time Slots Response Status: ${response.statusCode}');
+      debugPrint('📥 Time Slots Response Body: ${response.body}');
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return List<Map<String, dynamic>>.from(data['data']['slots']);
+        return List<String>.from(data['slots'] ?? []);
       } else {
         throw Exception('Failed to load time slots: ${response.statusCode}');
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error fetching time slots: $e');
+      debugPrint('❌ Stack trace: $stackTrace');
       rethrow;
     }
   }
 
   Future<List<Map<String, dynamic>>> getCounselors() async {
     try {
+      debugPrint('🔍 Fetching counselors...');
       final token = await _authService.getToken();
       if (token == null) throw Exception('No authentication token found');
 
@@ -175,13 +183,53 @@ class AppointmentService {
         },
       );
 
+      debugPrint('📥 Counselors Response Status: ${response.statusCode}');
+      debugPrint('📥 Counselors Response Body: ${response.body}');
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         return List<Map<String, dynamic>>.from(data['data']);
       } else {
         throw Exception('Failed to load counselors: ${response.statusCode}');
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error fetching counselors: $e');
+      debugPrint('❌ Stack trace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  Future<Map<String, int>> getAppointmentCounts() async {
+    try {
+      debugPrint('🔍 Fetching appointment counts...');
+      final token = await _authService.getToken();
+      if (token == null) throw Exception('No authentication token found');
+
+      final response = await _client.get(
+        Uri.parse('${ApiConfig.baseUrl}/appointments/counts'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      );
+
+      debugPrint('📥 Appointment Counts Response Status: ${response.statusCode}');
+      debugPrint('📥 Appointment Counts Response Body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return {
+          'upcoming': data['upcoming'] ?? 0,
+          'pending': data['pending'] ?? 0,
+          'past': data['past'] ?? 0,
+          'cancelled': data['cancelled'] ?? 0,
+        };
+      } else {
+        throw Exception('Failed to load appointment counts: ${response.statusCode}');
+      }
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error fetching appointment counts: $e');
+      debugPrint('❌ Stack trace: $stackTrace');
       rethrow;
     }
   }

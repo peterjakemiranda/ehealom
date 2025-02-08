@@ -1,43 +1,37 @@
 class Resource {
-  final String id;
   final String uuid;
   final String title;
   final String content;
-  final String type;
-  final String category;
+  final String? imageUrl;
   final String? fileUrl;
+  final List<Map<String, dynamic>> categories;
   final bool isPublished;
-  final Map<String, dynamic>? creator;
-  final DateTime createdAt;
-  final DateTime updatedAt;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
 
   Resource({
-    required this.id,
     required this.uuid,
     required this.title,
     required this.content,
-    required this.type,
-    required this.category,
+    this.imageUrl,
     this.fileUrl,
-    required this.isPublished,
-    this.creator,
-    required this.createdAt,
-    required this.updatedAt,
+    this.categories = const [],
+    this.isPublished = true,
+    this.createdAt,
+    this.updatedAt,
   });
 
   factory Resource.fromJson(Map<String, dynamic> json) {
     return Resource(
-      id: json['id'].toString(),
       uuid: json['uuid'],
       title: json['title'],
       content: json['content'],
-      type: json['type'],
-      category: json['category'],
+      imageUrl: json['image_path'] ?? json['image_url'],
       fileUrl: json['file_url'],
-      isPublished: json['is_published'] ?? false,
-      creator: json['creator'],
-      createdAt: DateTime.parse(json['created_at']),
-      updatedAt: DateTime.parse(json['updated_at']),
+      categories: List<Map<String, dynamic>>.from(json['categories'] ?? []),
+      isPublished: json['is_published'] ?? true,
+      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at']) : null,
+      updatedAt: json['updated_at'] != null ? DateTime.parse(json['updated_at']) : null,
     );
   }
 } 

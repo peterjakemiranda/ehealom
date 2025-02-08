@@ -47,6 +47,14 @@ class _LoginViewState extends State<LoginView> {
         _passwordController.text,
       );
       debugPrint('LoginView: Login successful');
+      
+      if (!mounted) return;
+      
+      // Add navigation after successful login
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.of(context).pushReplacementNamed('/home');
+      });
+      
     } catch (e) {
       debugPrint('LoginView: Login error - $e');
       if (!mounted) return;
@@ -67,18 +75,11 @@ class _LoginViewState extends State<LoginView> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 48),
-              // App Logo or Icon
-              Icon(
-                Icons.psychology_outlined,
-                size: 64,
-                color: Theme.of(context).primaryColor,
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'Welcome Back',
-                style: Theme.of(context).textTheme.titleLarge,
-                textAlign: TextAlign.center,
+              const SizedBox(height: 80),
+              Image.asset(
+                'assets/images/logo.png',
+                height: 50,
+                fit: BoxFit.contain,
               ),
               const SizedBox(height: 8),
               Text(

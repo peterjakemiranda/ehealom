@@ -6,31 +6,34 @@ import '../views/resources/resource_list_view.dart';
 import 'bottom_nav_bar.dart';
 
 class AppScaffold extends StatelessWidget {
-  final String title;
+  final Widget? title;
   final Widget body;
   final int currentIndex;
+  final bool hideBackButton;
   final List<Widget>? actions;
   final Widget? floatingActionButton;
-  final bool hideBackButton;
+  final Function(int)? onNavigationItemSelected;
 
   const AppScaffold({
     Key? key,
-    required this.title,
+    this.title,
     required this.body,
     required this.currentIndex,
+    this.hideBackButton = false,
     this.actions,
     this.floatingActionButton,
-    this.hideBackButton = false,
+    this.onNavigationItemSelected,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    final authController = context.watch<AuthController>();
-    
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: !hideBackButton,
-        title: Text(title),
+        title: title ?? const Text(''),
+        backgroundColor: const Color(0xFFE8F3F1),
+        foregroundColor: const Color(0xFF2D3436),
+        elevation: 0,
         actions: [
           IconButton(
             icon: const Icon(Icons.account_circle),
@@ -55,8 +58,10 @@ class AppScaffold extends StatelessWidget {
                           leading: const Icon(Icons.logout),
                           title: const Text('Logout'),
                           onTap: () async {
+                            final navigator = Navigator.of(context);
                             Navigator.pop(context);
-                            await authController.logout();
+                            await context.read<AuthController>().logout();
+                            navigator.pushNamedAndRemoveUntil('/login', (route) => false);
                           },
                         ),
                       ],
@@ -75,7 +80,10 @@ class AppScaffold extends StatelessWidget {
           splashColor: Colors.transparent,
           highlightColor: Colors.transparent,
         ),
-        child: BottomNavBar(currentIndex: currentIndex),
+        child: BottomNavBar(
+          currentIndex: currentIndex,
+          onTap: onNavigationItemSelected,
+        ),
       ) : null,
       floatingActionButton: floatingActionButton,
     );

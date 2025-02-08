@@ -1,26 +1,56 @@
 <template>
-  <form @submit.prevent="handleSubmit" class="space-y-4">
-    <div>
-      <label for="email" class="block mb-2 text-sm font-medium text-gray-900">Email</label>
-      <input
-        type="email"
-        id="email"
-        v-model="email"
-        required
-        class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
-      />
+  <form @submit.prevent="handleSubmit" class="space-y-6">
+    <div v-if="error" class="alert alert-error text-sm">
+      {{ error }}
     </div>
+
     <div>
-      <label for="password" class="block mb-2 text-sm font-medium text-gray-900">Password</label>
-      <input
-        type="password"
-        id="password"
-        v-model="password"
-        required
-        class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
-      />
+      <label for="email" class="block text-sm font-medium text-base-content">
+        Email address
+      </label>
+      <div class="mt-1">
+        <input
+          id="email"
+          type="email"
+          required
+          v-model="email"
+          :disabled="isLoading"
+          class="input input-bordered w-full"
+          placeholder="Enter your email"
+        />
+      </div>
     </div>
-    <button type="submit" class="btn btn-primary w-full">Login</button>
+
+    <div>
+      <label for="password" class="block text-sm font-medium text-base-content">
+        Password
+      </label>
+      <div class="mt-1">
+        <input
+          id="password"
+          type="password"
+          required
+          v-model="password"
+          :disabled="isLoading"
+          class="input input-bordered w-full"
+          placeholder="Enter your password"
+        />
+      </div>
+    </div>
+
+    <div>
+      <button 
+        type="submit" 
+        class="btn btn-primary w-full"
+        :disabled="isLoading"
+      >
+        <span v-if="isLoading">
+          <span class="loading loading-spinner"></span>
+          Signing in...
+        </span>
+        <span v-else>Sign in</span>
+      </button>
+    </div>
   </form>
 </template>
 
@@ -28,19 +58,31 @@
 import { ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
+import { useSettingsStore } from '@/stores/settingsStore'
 
 const auth = useAuthStore()
 const router = useRouter()
+const settingsStore = useSettingsStore()
 
 const email = ref('')
 const password = ref('')
+const error = ref('')
+const isLoading = ref(false)
 
 const handleSubmit = async () => {
-  const success = await auth.login(email.value, password.value)
-  if (success) {
-    router.push('/appointments')
-  } else {
-    // Handle login error (e.g., show error message)
+  error.value = ''
+  isLoading.value = true
+  
+  try {
+    const success = await auth.login(email.value, password.value)
+    if (success) {
+      // No need to fetch settings anymore
+      await router.push('/appointments')
+    }
+  } catch (err) {
+    error.value = err.response?.data?.message || 'Failed to sign in'
+  } finally {
+    isLoading.value = false
   }
 }
 </script>

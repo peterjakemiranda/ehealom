@@ -1,24 +1,18 @@
 <template>
   <div class="container mx-auto p-4">
     <!-- Header with Add Button -->
-    <div class="flex justify-between items-center mb-6">
-      <div>
-        <h1 class="text-2xl font-bold">Appointments</h1>
-        <p class="text-gray-600">See your scheduled events from your calendar events links.</p>
-      </div>
-      
-      <!-- Add Appointment Button -->
-      <button 
-        v-if="isStudent"
-        class="btn btn-primary"
-        @click="createAppointment"
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+      <h2 class="text-xl font-bold">Appointments</h2>
+      <!-- <button 
+        v-if="!isStudent" 
+        @click="createAppointment" 
+        class="btn btn-primary mt-2 sm:mt-0"
       >
-        <PlusIcon class="h-5 w-5 mr-2" />
         Book Appointment
-      </button>
+      </button> -->
     </div>
 
-    <!-- Filters -->
+    <!-- Status Filters with Counts -->
     <div class="mb-6">
       <div class="inline-flex bg-base-100 rounded-lg p-1 shadow-sm">
         <button 
@@ -32,11 +26,10 @@
           ]"
           @click="statusFilter = filter.value"
         >
-          {{ filter.label }}
+          {{ filter.label }} ({{ counts[filter.value] || 0 }})
         </button>
       </div>
-    </div>
-
+      </div>
     <!-- Appointments List -->
     <div v-if="!appointmentStore.isLoading" class="space-y-6">
       <div v-for="(group, month) in groupedAppointments" :key="month">
@@ -55,14 +48,14 @@
                 <button 
                   v-if="canConfirmAppointment(appointment)"
                   @click="handleStatusUpdate(appointment, 'confirmed')"
-                  class="btn btn-success btn-sm"
+                  class="btn btn-success btn-sm text-white"
                 >
                   Confirm
                 </button>
                 <button 
                   v-if="canCompleteAppointment(appointment)"
                   @click="handleStatusUpdate(appointment, 'completed')"
-                  class="btn btn-info btn-sm"
+                  class="btn btn-info btn-sm text-white"
                 >
                   Complete
                 </button>
@@ -111,20 +104,25 @@ import AppointmentCard from '@/components/AppointmentCard.vue'
 import AppointmentForm from '@/components/AppointmentForm.vue'
 import Drawer from '@/components/common/BaseDrawer.vue'
 import { swalHelper } from '@/utils/swalHelper'
+import http from '@/utils/http'
 
 const appointmentStore = useAppointmentStore()
 const authStore = useAuthStore()
 const showDrawer = ref(false)
 const selectedAppointment = ref({})
 const statusFilter = ref('upcoming')
+const counts = ref({
+  upcoming: 0,
+  pending: 0,
+  past: 0,
+  cancelled: 0
+})
 
 const isStudent = computed(() => authStore.user?.user_type === 'student')
-const isCounselor = computed(() => authStore.user?.user_type === 'counselor')
 
 const statusFilters = [
   { value: 'upcoming', label: 'Upcoming' },
   { value: 'pending', label: 'Pending' },
-  { value: 'recurring', label: 'Recurring' },
   { value: 'past', label: 'Past' },
   { value: 'cancelled', label: 'Cancelled' }
 ]
@@ -135,30 +133,11 @@ const drawerTitle = computed(() => {
 
 const filteredAppointments = computed(() => {
   let appointments = appointmentStore.appointments
-
-  switch (statusFilter.value) {
-    case 'upcoming':
-      return appointments.filter(apt => 
-        ['confirmed', 'pending'].includes(apt.status) && 
-        new Date(apt.appointment_date) >= new Date()
-      )
-    case 'pending':
-      return appointments.filter(apt => apt.status === 'pending')
-    case 'cancelled':
-      return appointments.filter(apt => apt.status === 'cancelled')
-    case 'past':
-      return appointments.filter(apt => 
-        ['confirmed', 'completed'].includes(apt.status) && 
-        new Date(apt.appointment_date) < new Date()
-      )
-    default:
-      return appointments
-  }
+  return appointments
 })
 
 const groupedAppointments = computed(() => {
   const groups = {}
-  
   filteredAppointments.value.forEach(appointment => {
     const monthKey = format(parseISO(appointment.appointment_date), 'MMMM yyyy')
     if (!groups[monthKey]) {
@@ -166,7 +145,6 @@ const groupedAppointments = computed(() => {
     }
     groups[monthKey].push(appointment)
   })
-  
   return groups
 })
 
@@ -180,10 +158,13 @@ watch(statusFilter, () => {
 
 async function fetchAppointments(page = 1) {
   try {
-    await appointmentStore.fetchAppointments({
-      page,
-      status: statusFilter.value === 'upcoming' ? '' : statusFilter.value
-    })
+    await Promise.all([
+      appointmentStore.fetchAppointments({
+        page,
+        status: statusFilter.value === 'upcoming' ? 'upcoming' : statusFilter.value
+      }),
+      fetchCounts()
+    ])
   } catch (error) {
     console.error('Failed to fetch appointments:', error)
   }
@@ -215,6 +196,7 @@ function editAppointment(appointment) {
 async function handleStatusUpdate(appointment, newStatus) {
   try {
     await appointmentStore.updateAppointmentStatus(appointment.uuid, newStatus)
+    await fetchCounts()
     swalHelper.toast('success', 'Appointment status updated')
   } catch (error) {
     console.error('Failed to update status:', error)
@@ -253,14 +235,6 @@ const canManageAppointments = computed(() => {
   return authStore.user?.permissions?.includes('manage appointments')
 })
 
-const canViewAppointments = computed(() => {
-  return authStore.user?.permissions?.includes('view appointments')
-})
-
-const canCancelAppointments = computed(() => {
-  return authStore.user?.permissions?.includes('cancel appointments')
-})
-
 const canConfirmAppointment = (appointment) => {
   return canManageAppointments.value && appointment.status === 'pending'
 }
@@ -276,6 +250,15 @@ const canEditAppointment = (appointment) => {
     return appointment.status === 'pending' && appointment.student_id === authStore.user?.id
   }
   return canManageAppointments.value && ['pending', 'confirmed'].includes(appointment.status)
+}
+
+async function fetchCounts() {
+  try {
+    const response = await http.get('/api/appointments/counts')
+    counts.value = response.data
+  } catch (error) {
+    console.error('Failed to fetch counts:', error)
+  }
 }
 </script>
 

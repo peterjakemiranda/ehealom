@@ -15,7 +15,8 @@ export const useAppointmentStore = defineStore({
       to: null
     },
     isLoading: false,
-    error: null
+    error: null,
+    availableSlots: []
   }),
 
   getters: {
@@ -120,14 +121,21 @@ export const useAppointmentStore = defineStore({
     },
 
     async fetchAvailableSlots(counselorId, date) {
+      this.isLoading = true
       try {
-        const response = await http.get('/api/appointments/available-slots', {
-          params: { counselor_id: counselorId, date }
+        const { data } = await http.get('/api/appointments/available-slots', {
+          params: {
+            counselor_id: counselorId,
+            date: date
+          }
         })
-        return response.data.data.slots
+        this.availableSlots = data.slots
+        return data.slots
       } catch (error) {
         handleError(error)
         throw error
+      } finally {
+        this.isLoading = false
       }
     }
   }

@@ -44,20 +44,27 @@
         <label class="label">
           <span class="label-text text-gray-700">Available Time Slots</span>
         </label>
-        <div class="grid grid-cols-4 gap-2">
+        
+        <div v-if="isLoadingSlots" class="flex justify-center py-4">
+          <span class="loading loading-spinner loading-md"></span>
+        </div>
+        
+        <div v-else-if="!timeSlots.length" class="text-sm text-gray-500 py-2">
+          No available time slots for this date
+        </div>
+        
+        <div v-else class="grid grid-cols-3 gap-2">
           <button
             v-for="slot in timeSlots"
-            :key="slot.time"
+            :key="slot"
             type="button"
-            class="btn btn-sm w-full"
             :class="[
-              selectedTime === slot.time ? 'btn-primary' : 'btn-outline',
-              { 'btn-disabled': !slot.available && selectedTime !== slot.time }
+              'btn btn-sm',
+              selectedTime === slot ? 'btn-primary' : 'btn-outline'
             ]"
-            @click="selectTimeSlot(slot.time)"
-            :disabled="!canEditDateTime || (!slot.available && selectedTime !== slot.time)"
+            @click="selectedTime = slot"
           >
-            {{ slot.display_time }}
+            {{ formatTime(slot) }}
           </button>
         </div>
       </div>
@@ -154,9 +161,11 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useUserStore } from '@/stores/userStore'
 import { useAuthStore } from '@/stores/auth'
+import { useAppointmentStore } from '@/stores/appointmentStore'
 import { format, parseISO } from 'date-fns'
 import { formatInTimeZone } from 'date-fns-tz'
 import http from '@/utils/http'
+import swalHelper from '@/utils/swalHelper'
 
 const props = defineProps({
   appointment: {
@@ -168,13 +177,22 @@ const props = defineProps({
 const emit = defineEmits(['save', 'cancel'])
 const userStore = useUserStore()
 const authStore = useAuthStore()
+const appointmentStore = useAppointmentStore()
 const isLoading = ref(false)
 const counselors = ref([])
 const timeSlots = ref([])
 const selectedDate = ref('')
 const selectedTime = ref('')
+const isLoadingSlots = ref(false)
 
-const isCounselor = computed(() => authStore.user?.roles.includes('counselor'))
+const isCounselor = computed(() => {
+  return authStore.user?.roles?.includes('counselor') || false
+})
+
+const isStudent = computed(() => {
+  return authStore.user?.roles?.includes('student') || false
+})
+
 const isEditing = computed(() => !!props.appointment?.id)
 
 const canManageAppointments = computed(() => {
@@ -188,6 +206,10 @@ const canEditDateTime = computed(() => {
 
 const showCounselorSelection = computed(() => {
   return !canManageAppointments.value || authStore.user?.permissions?.includes('manage users')
+})
+
+const availableSlots = computed(() => {
+  return appointmentStore.availableSlots || []
 })
 
 const formData = ref({
@@ -229,8 +251,12 @@ watch(() => props.appointment, (newVal) => {
     formData.value = { ...formData.value, ...newVal }
     
     if (newVal.appointment_date) {
-      selectedDate.value = format(parseISO(newVal.appointment_date), 'yyyy-MM-dd')
-      selectedTime.value = format(parseISO(newVal.appointment_date), 'HH:mm')
+      const appointmentDate = parseISO(newVal.appointment_date)
+      selectedDate.value = format(appointmentDate, 'yyyy-MM-dd')
+      selectedTime.value = format(appointmentDate, 'HH:mm')
+      
+      // Ensure we keep the original appointment date if we're not changing it
+      formData.value.appointment_date = newVal.appointment_date
       
       if (newVal.counselor_id) {
         formData.value.counselor_id = newVal.counselor_id
@@ -275,40 +301,50 @@ const isValidForm = computed(() => {
 })
 
 async function loadAvailableSlots() {
-  if (!formData.value.counselor_id || !selectedDate.value) return
+  if (!formData.value.counselor_id || !selectedDate.value) {
+    console.log('Missing required data:', { 
+      counselorId: formData.value.counselor_id, 
+      date: selectedDate.value 
+    })
+    return
+  }
+  
+  isLoadingSlots.value = true
+  timeSlots.value = []
   
   try {
-    isLoading.value = true
-    
+    console.log('Fetching slots with:', {
+      counselor_id: formData.value.counselor_id,
+      date: selectedDate.value
+    })
+
     const response = await http.get('/api/appointments/available-slots', {
       params: {
         counselor_id: formData.value.counselor_id,
-        date: selectedDate.value,
-        current_appointment_id: isEditing.value ? props.appointment.id : null
+        date: selectedDate.value
       }
     })
-    timeSlots.value = response.data.data.slots
 
-    // If editing, handle time slot preselection
-    if (isEditing.value && props.appointment.appointment_date) {
-      const appointmentDate = parseISO(props.appointment.appointment_date)
-      const selectedDateObj = parseISO(selectedDate.value)
+    console.log('API Response:', response) // Debug log
+
+    if (response && response.data) {
+      timeSlots.value = response.data.slots || []
       
-      // Only preselect if we're on the same date
-      if (format(appointmentDate, 'yyyy-MM-dd') === format(selectedDateObj, 'yyyy-MM-dd')) {
-        selectedTime.value = format(appointmentDate, 'HH:mm')
-        formData.value.appointment_date = props.appointment.appointment_date
-      } else {
-        // Clear selection if date is different
+      // Clear selected time if it's no longer available
+      if (selectedTime.value && !timeSlots.value.includes(selectedTime.value)) {
         selectedTime.value = ''
-        formData.value.appointment_date = ''
       }
+    } else {
+      console.error('Invalid response structure:', response)
+      timeSlots.value = []
     }
   } catch (error) {
     console.error('Failed to load time slots:', error)
+    console.error('Error response:', error.response?.data) // Log the error response
     timeSlots.value = []
+    swalHelper.toast('error', 'Failed to load available time slots')
   } finally {
-    isLoading.value = false
+    isLoadingSlots.value = false
   }
 }
 
@@ -317,16 +353,54 @@ watch(selectedDate, () => {
   loadAvailableSlots()
 })
 
+// Update the selectTimeSlot function
 function selectTimeSlot(time) {
   selectedTime.value = time
   const localDateTime = `${selectedDate.value}T${time}`
   
-  // Convert local time to UTC for storage using formatInTimeZone
-  formData.value.appointment_date = formatInTimeZone(
-    new Date(localDateTime),
-    'UTC',
-    "yyyy-MM-dd'T'HH:mm:ssXXX"
-  )
+  try {
+    // Create a new Date object in local timezone
+    const localDate = new Date(localDateTime)
+    
+    // Format the date in ISO format with timezone offset
+    formData.value.appointment_date = localDate.toISOString()
+    
+    console.log('Selected datetime:', {
+      time,
+      localDateTime,
+      formattedDate: formData.value.appointment_date
+    })
+  } catch (error) {
+    console.error('Error setting appointment date:', error)
+  }
+}
+
+// Add a watch for selectedTime to update formData when time is selected
+watch(selectedTime, (newTime) => {
+  if (newTime && selectedDate.value) {
+    selectTimeSlot(newTime)
+  }
+})
+
+// Add this function to format the time
+function formatTime(time) {
+  if (!time) return ''
+  
+  try {
+    // Parse the HH:mm time and format it to 12-hour format
+    const [hours, minutes] = time.split(':')
+    const date = new Date()
+    date.setHours(parseInt(hours), parseInt(minutes))
+    
+    return new Intl.DateTimeFormat('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    }).format(date)
+  } catch (error) {
+    console.error('Error formatting time:', error)
+    return time // Return original value if formatting fails
+  }
 }
 
 async function onSubmit() {

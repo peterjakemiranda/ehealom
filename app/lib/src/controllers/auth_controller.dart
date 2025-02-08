@@ -1,8 +1,14 @@
 import 'package:flutter/foundation.dart';
 import '../services/auth_service.dart';
+import '../services/storage_service.dart';
+import 'dart:async';
 
 class AuthController with ChangeNotifier {
   final AuthService _authService = AuthService();
+  final StorageService _storage = StorageService();
+  
+  final _authStateController = StreamController<bool>.broadcast();
+  Stream<bool> get authStateStream => _authStateController.stream;
   
   bool _isAuthenticated = false;
   bool _isLoading = true;
@@ -64,6 +70,7 @@ class AuthController with ChangeNotifier {
       
       debugPrint('AuthController: Fetching user data');
       await _fetchUser();
+      _isAuthenticated = true;
       debugPrint('AuthController: Login process completed successfully');
     } catch (e) {
       debugPrint('AuthController: Login error - $e');
@@ -102,17 +109,24 @@ class AuthController with ChangeNotifier {
   Future<void> logout() async {
     _isLoading = true;
     notifyListeners();
-
+    
     try {
       await _authService.logout();
     } catch (e) {
-      debugPrint('Logout error: $e');
-      // Continue with logout even if API call fails
+      debugPrint('Error during logout: $e');
     } finally {
+      // Clear stored data
+      await _storage.delete(key: 'token');
+      await _storage.delete(key: 'user');
+      
+      // Update state
       _isAuthenticated = false;
       _user = null;
       _token = null;
       _isLoading = false;
+      
+      // Broadcast auth state change
+      _authStateController.add(false);
       notifyListeners();
     }
   }
@@ -142,5 +156,11 @@ class AuthController with ChangeNotifier {
     } catch (e) {
       rethrow;
     }
+  }
+
+  @override
+  void dispose() {
+    _authStateController.close();
+    super.dispose();
   }
 }

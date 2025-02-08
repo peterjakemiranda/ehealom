@@ -1,4 +1,4 @@
-package com.example.app
+package com.ehealom.ehealomapp
 
 import io.flutter.embedding.android.FlutterActivity
 

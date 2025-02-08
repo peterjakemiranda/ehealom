@@ -18,14 +18,14 @@
           <!-- Title and Time - First Line -->
           <div class="flex items-center gap-4">
             <span class="font-medium">{{ appointment.reason }}</span>
-            <div class="flex items-center gap-2 text-sm text-gray-600">
-              <ClockIcon class="h-4 w-4" />
-              {{ formatLocalDate(appointment.appointment_date, 'h:mm a') }}
-            </div>
           </div>
 
           <!-- Location and Participant - Second Line -->
           <div class="flex items-center gap-4 mt-1 text-sm text-gray-600">
+            <div class="flex items-center gap-2 text-sm text-gray-600">
+              <ClockIcon class="h-4 w-4" />
+              {{ formatLocalDate(appointment.appointment_date, 'h:mm a') }}
+            </div>
             <div class="flex items-center gap-2">
               <MapPinIcon class="h-4 w-4" />
               {{ appointment.location_type === 'online' ? 'Online' : appointment.location }}
@@ -40,22 +40,21 @@
               </div>
               {{ isStudent ? appointment.counselor?.name : appointment.student?.name }}
             </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Right: Status and Actions -->
-      <div class="flex items-center gap-3">
-        <span 
+            <span 
           :class="[
-            'badge',
+            'badge text-white',
             statusClass,
             'capitalize'
           ]"
         >
           {{ appointment.status }}
         </span>
+          </div>
+        </div>
+      </div>
 
+      <!-- Right: Status and Actions -->
+      <div class="flex items-center gap-3">
         <div class="flex gap-2">
           <div class="dropdown dropdown-end" v-if="canUpdateStatus">
             <label tabindex="0" class="btn btn-sm btn-ghost">
@@ -69,7 +68,6 @@
               </li>
             </ul>
           </div>
-          
           <button 
             v-if="canEdit"
             class="btn btn-ghost btn-sm"
@@ -77,6 +75,7 @@
           >
             <PencilIcon class="h-4 w-4" />
           </button>
+          <slot name="actions"></slot>
         </div>
       </div>
     </div>
@@ -85,19 +84,18 @@
 
 <script setup>
 import { computed } from 'vue'
-import { parseISO } from 'date-fns'
 import { formatInTimeZone } from 'date-fns-tz'
-import { useAuthStore } from '@/stores/auth'
+import { parseISO } from 'date-fns'
 import { 
-  UserIcon, 
-  ClockIcon,
-  MapPinIcon,
-  ClipboardDocumentListIcon, 
-  ChatBubbleLeftIcon,
+  MapPinIcon, 
+  ClockIcon, 
+  UserIcon,
   EllipsisVerticalIcon,
   PencilIcon
 } from '@heroicons/vue/24/outline'
+import { useAuthStore } from '@/stores/auth'
 
+const authStore = useAuthStore()
 const props = defineProps({
   appointment: {
     type: Object,
@@ -106,19 +104,22 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['edit', 'update-status'])
-const authStore = useAuthStore()
 
 const isStudent = computed(() => authStore.user?.user_type === 'student')
 const isCounselor = computed(() => authStore.user?.user_type === 'counselor')
 
+const canManageAppointments = computed(() => {
+  return authStore.user?.permissions?.includes('manage appointments')
+})
+
 const statusClass = computed(() => {
-  switch (props.appointment.status) {
-    case 'pending': return 'badge-warning'
-    case 'confirmed': return 'badge-success'
-    case 'cancelled': return 'badge-error'
-    case 'completed': return 'badge-info'
-    default: return 'badge-ghost'
+  const classes = {
+    pending: 'badge-warning',
+    confirmed: 'badge-success',
+    completed: 'badge-info',
+    cancelled: 'badge-error'
   }
+  return classes[props.appointment.status] || 'badge-ghost'
 })
 
 const canUpdateStatus = computed(() => {
@@ -129,6 +130,11 @@ const canUpdateStatus = computed(() => {
 const canEdit = computed(() => {
   if (props.appointment.status !== 'pending') return false
   return isStudent.value || isCounselor.value
+})
+
+const canCompleteAppointment = computed(() => {
+  return canManageAppointments.value && 
+    props.appointment.status === 'confirmed'
 })
 
 const availableStatuses = computed(() => {

@@ -23,51 +23,47 @@ class ResourceService {
 
   Future<Map<String, dynamic>> fetchResources({
     int page = 1,
-    String? type,
     String? category,
-    String? uuid,
+    String? search,
     int perPage = 10,
   }) async {
     try {
+      final queryParams = {
+        'page': page.toString(),
+        'per_page': perPage.toString(),
+        if (category != null && category.isNotEmpty) 'category': category,
+        if (search != null && search.isNotEmpty) 'search': search,
+      };
+
       final url = Uri.parse('${ApiConfig.baseUrl}/resources').replace(
-        queryParameters: {
-          'page': page.toString(),
-          if (type != null) 'type': type,
-          if (category != null) 'category': category,
-          if (uuid != null) 'uuid': uuid,
-          'per_page': perPage.toString(),
-        },
+        queryParameters: queryParams,
       );
 
-      // Log request
-      debugPrint('🌐 GET $url');
-      debugPrint('🔑 Token: ${await _authService.getToken()}');
+      debugPrint('Fetching resources with URL: $url');
+
+      final token = await _authService.getToken();
+      if (token == null) throw Exception('No authentication token found');
 
       final response = await _client.get(
         url,
         headers: {
-          'Authorization': 'Bearer ${await _authService.getToken()}',
+          'Authorization': 'Bearer $token',
           'Accept': 'application/json',
         },
       );
 
-      // Log response
-      debugPrint('📥 Response status: ${response.statusCode}');
-      debugPrint('📥 Response body: ${response.body}');
-
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        debugPrint('Resources response: $data');
         return {
-          'resources': (data['data'] as List)
-              .map((json) => Resource.fromJson(json))
-              .toList(),
+          'data': data['data'] as List,
           'meta': data['meta'],
         };
       } else {
         throw Exception('Failed to load resources: ${response.statusCode}');
       }
     } catch (e) {
-      debugPrint('❌ Error in fetchResources: $e');
+      debugPrint('Error fetching resources: $e');
       rethrow;
     }
   }
@@ -173,6 +169,63 @@ class ResourceService {
         throw Exception('Failed to delete resource: ${response.statusCode}');
       }
     } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> fetchResource(String uuid) async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null) throw Exception('No authentication token found');
+
+      final url = Uri.parse('${ApiConfig.baseUrl}/resources/$uuid');
+      
+      debugPrint('🌐 Fetching resource URL: $url');
+
+      final response = await _client.get(
+        url,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      );
+
+      debugPrint('📥 Resource Response Status: ${response.statusCode}');
+      debugPrint('📥 Resource Response Body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data;
+      } else {
+        throw Exception('Failed to load resource: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('❌ Error in fetchResource: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchCategories() async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null) throw Exception('No authentication token found');
+
+      final response = await _client.get(
+        Uri.parse('${ApiConfig.baseUrl}/categories'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return List<Map<String, dynamic>>.from(data['data'] ?? []);
+      } else {
+        throw Exception('Failed to load categories');
+      }
+    } catch (e) {
+      debugPrint('Error fetching categories: $e');
       rethrow;
     }
   }

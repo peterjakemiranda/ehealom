@@ -20,6 +20,8 @@ class AppointmentResource extends JsonResource
             'notes' => $this->notes,
             'student' => new UserResource($this->whenLoaded('student')),
             'counselor' => new UserResource($this->whenLoaded('counselor')),
+            'location_type' => $this->location_type,
+            'location' => $this->location,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at
         ];

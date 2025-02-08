@@ -24,7 +24,7 @@ class _AppointmentFormViewState extends State<AppointmentFormView> {
   bool _isLoading = false;
   
   List<Map<String, dynamic>> _counselors = [];
-  List<Map<String, dynamic>> _timeSlots = [];
+  List<String> _timeSlots = [];
 
   @override
   void initState() {
@@ -33,16 +33,20 @@ class _AppointmentFormViewState extends State<AppointmentFormView> {
   }
 
   Future<void> _loadCounselors() async {
+    debugPrint('🔄 Loading counselors...');
     setState(() => _isLoading = true);
     try {
       _counselors = await _appointmentService.getCounselors();
+      debugPrint('✅ Loaded ${_counselors.length} counselors');
       if (_counselors.isNotEmpty) {
         _selectedCounselorId = _counselors.first['id'].toString();
+        debugPrint('👉 Selected counselor ID: $_selectedCounselorId');
         if (_selectedDate != null) {
           await _loadTimeSlots();
         }
       }
     } catch (e) {
+      debugPrint('❌ Error loading counselors: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to load counselor: $e')),
@@ -54,30 +58,41 @@ class _AppointmentFormViewState extends State<AppointmentFormView> {
   }
 
   Future<void> _loadTimeSlots() async {
-    if (_selectedCounselorId == null || _selectedDate == null) return;
+    if (_selectedCounselorId == null || _selectedDate == null) {
+      debugPrint('⚠️ Cannot load time slots: counselor or date not selected');
+      return;
+    }
     
+    debugPrint('🔄 Loading time slots for counselor: $_selectedCounselorId, date: $_selectedDate');
     setState(() => _isLoading = true);
     try {
-      _timeSlots = await _appointmentService.fetchAvailableSlots(
+      final slots = await _appointmentService.fetchAvailableSlots(
         counselorId: _selectedCounselorId!,
         date: _selectedDate!.toIso8601String().split('T')[0],
       );
-      setState(() {});
+      
+      debugPrint('✅ Loaded ${slots.length} time slots');
+      setState(() {
+        _timeSlots = slots;
+      });
     } catch (e) {
+      debugPrint('❌ Error loading time slots: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to load time slots: $e')),
         );
       }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return AppScaffold(
-      title: 'Book Appointment',
+      title: const Text('Book Appointment'),
       currentIndex: -1,
       body: _isLoading && _counselors.isEmpty
           ? const Center(child: CircularProgressIndicator())
@@ -156,32 +171,52 @@ class _AppointmentFormViewState extends State<AppointmentFormView> {
   }
 
   Widget _buildTimeSlots() {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     if (_timeSlots.isEmpty) {
       return const Center(
         child: Text('No available time slots for selected date'),
       );
     }
 
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: _timeSlots.map((slot) {
-        final time = slot['time'];
-        final isAvailable = slot['available'];
-        final isSelected = _selectedTime == time;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Available Time Slots',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _timeSlots.map((time) {
+            final isSelected = _selectedTime == time;
+            
+            // Convert 24hr to 12hr format
+            final timeComponents = time.split(':');
+            final hour = int.parse(timeComponents[0]);
+            final minute = timeComponents[1];
+            final period = hour >= 12 ? 'PM' : 'AM';
+            final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
+            final displayTime = '$displayHour:$minute $period';
 
-        return FilterChip(
-          label: Text(slot['display_time']),
-          selected: isSelected,
-          onSelected: isAvailable ? (selected) {
-            setState(() => _selectedTime = selected ? time : null);
-          } : null,
-          backgroundColor: isAvailable ? null : Colors.grey.shade200,
-          labelStyle: TextStyle(
-            color: isAvailable ? null : Colors.grey,
-          ),
-        );
-      }).toList(),
+            return FilterChip(
+              label: Text(displayTime), // Show 12hr format
+              selected: isSelected,
+              onSelected: (selected) {
+                setState(() => _selectedTime = selected ? time : null); // Keep 24hr format internally
+              },
+              backgroundColor: isSelected ? Theme.of(context).primaryColor : null,
+              labelStyle: TextStyle(
+                color: isSelected ? Colors.white : null,
+              ),
+            );
+          }).toList(),
+        ),
+      ],
     );
   }
 
@@ -259,7 +294,7 @@ class _AppointmentFormViewState extends State<AppointmentFormView> {
     setState(() => _isLoading = true);
     try {
       final appointmentDate = DateTime.parse(
-        '${_selectedDate!.toIso8601String().split('T')[0]}T$_selectedTime:00',
+        '${_selectedDate!.toIso8601String().split('T')[0]}T$_selectedTime',
       );
       
       await _appointmentService.createAppointment({

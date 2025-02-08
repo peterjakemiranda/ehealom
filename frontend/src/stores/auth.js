@@ -33,6 +33,8 @@ export const useAuthStore = defineStore({
     async clearAuth() {
       this.token = null;
       this.user = null;
+      this.permissions = [];
+      this.roles = [];
       this.isAuthenticated = false;
       this.lastVerified = null;
       localStorage.removeItem('token');
@@ -45,8 +47,11 @@ export const useAuthStore = defineStore({
         const response = await http.post('/api/login', { email, password });
         if (response.data.user && response.data.token) {
           await this.setAuthData(response.data);
-          router.push('/');
+          // Ensure we fetch the user data right after login
+          await this.fetchUser();
+          return true;
         }
+        return false;
       } catch (error) {
         console.error('Error logging in:', error);
         throw error;
@@ -55,6 +60,8 @@ export const useAuthStore = defineStore({
 
     async setAuthData(data) {
       this.user = data.user;
+      this.permissions = data.user.permissions || [];
+      this.roles = data.user.roles || [];
       this.isAuthenticated = true;
       this.lastVerified = new Date().toISOString();
       await this.setToken(data.token);
@@ -66,6 +73,8 @@ export const useAuthStore = defineStore({
       await db.saveAuthState({
         token: data.token,
         user: data.user,
+        permissions: data.user.permissions || [],
+        roles: data.user.roles || [],
         expiresAt: expiresAt.toISOString()
       });
     },
@@ -99,14 +108,12 @@ export const useAuthStore = defineStore({
       try {
         const response = await http.get('/api/me')
         this.user = response.data
-        this.permissions = response.data.permissions
-        this.roles = response.data.roles
+        this.permissions = response.data.permissions || []
+        this.roles = response.data.roles || []
         this.isAuthenticated = true
       } catch (error) {
         console.error('Error fetching user:', error)
-        this.clearToken()
-        this.user = null
-        this.isAuthenticated = false
+        this.clearAuth()
       } finally {
         this.isLoading = false
       }
@@ -139,25 +146,14 @@ export const useAuthStore = defineStore({
         // Set initial state from stored data
         await this.setToken(authState.token);
         this.user = authState.user;
+        this.permissions = authState.permissions || [];
+        this.roles = authState.roles || [];
         this.isAuthenticated = true;
         this.offlineMode = !navigator.onLine;
 
         // Only verify with server if online
         if (navigator.onLine) {
-          try {
-            const response = await http.get('/api/me');
-            this.user = response.data;
-            return true;
-          } catch (error) {
-            if (error.response?.status === 401) {
-              await this.clearAuth();
-              return false;
-            }
-            // If server is unreachable but we have valid stored auth, stay logged in
-            console.warn('Server unreachable, continuing in offline mode');
-            this.offlineMode = true;
-            return true;
-          }
+          await this.fetchUser();
         }
         
         return true;
@@ -202,6 +198,24 @@ export const useAuthStore = defineStore({
 
     hasRole(role) {
       return this.roles.includes(role)
+    },
+
+    async updateProfile(payload) {
+      try {
+        const { data } = await http.put('/api/auth/profile', payload)
+        // Update the user data in the store
+        this.user = {
+          ...this.user,
+          user: {
+            ...this.user.user,
+            name: data.name
+          }
+        }
+        return data
+      } catch (error) {
+        handleError(error)
+        throw error
+      }
     }
   }
 });
