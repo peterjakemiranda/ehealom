@@ -21,7 +21,7 @@ class Environment {
   
   static String get apiBaseUrl {
     debugPrint('Environment: Using ${currentEnvironment} environment');
-    return dotenv.env['API_BASE_URL'] ?? 'https://ehealom.io';
+    return dotenv.env['API_BASE_URL'] ?? 'https://api.ehealom.live';
   }
 
   static String get openAiApiKey {
