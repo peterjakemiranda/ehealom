@@ -107,7 +107,6 @@ class AppointmentController extends Controller
             'appointment_date' => 'required|date|after:now',
             'reason' => 'required|string',
             'location_type' => 'required|in:online,on-site',
-            'location' => 'required_if:location_type,on-site|nullable|string',
         ]);
 
         // Check if user is a student
@@ -137,7 +136,7 @@ class AppointmentController extends Controller
             'appointment_date' => $validated['appointment_date'],
             'reason' => $validated['reason'],
             'location_type' => $validated['location_type'],
-            'location' => $validated['location'],
+            'location' => $validated['location'] ?? '',
             'status' => 'pending',
         ]);
 
@@ -227,41 +226,5 @@ class AppointmentController extends Controller
         ];
 
         return response()->json($counts);
-    }
-
-    public function getAvailableSlots(Request $request)
-    {
-        $request->validate([
-            'counselor_id' => 'required|exists:users,id',
-            'date' => 'required|date|after_or_equal:today',
-        ]);
-
-        $counselor = User::findOrFail($request->counselor_id);
-        if (!$counselor->hasRole('counselor')) {
-            return response()->json([
-                'message' => 'Selected user is not a counselor'
-            ], 422);
-        }
-
-        $date = Carbon::parse($request->date);
-        
-        // Get all slots
-        $slots = ['09:00', '10:00', '11:00', '13:00', '14:00', '15:00', '16:00'];
-        
-        // Get booked slots
-        $bookedSlots = Appointment::where('counselor_id', $request->counselor_id)
-            ->whereDate('appointment_date', $date)
-            ->pluck('appointment_date')
-            ->map(function($datetime) {
-                return Carbon::parse($datetime)->format('H:i');
-            })
-            ->toArray();
-        
-        // Remove booked slots
-        $availableSlots = array_values(array_diff($slots, $bookedSlots));
-
-        return response()->json([
-            'slots' => $availableSlots
-        ]);
     }
 } 
