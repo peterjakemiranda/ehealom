@@ -126,7 +126,7 @@ class _ProfileViewState extends State<ProfileView> {
 
     return AppScaffold(
       title: const Text('My Account'),
-      currentIndex: 3,
+      currentIndex: -1,
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(

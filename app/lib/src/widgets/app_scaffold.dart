@@ -27,16 +27,22 @@ class AppScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final authController = context.watch<AuthController>();
+    final isCounselor = authController.user?['roles']?.contains('counselor') ?? false;
+    
+    // Adjust currentIndex for counselors since they don't have the home tab
+    final adjustedIndex = isCounselor && currentIndex > 0 ? currentIndex - 1 : currentIndex;
+
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: !hideBackButton,
+        backgroundColor: Theme.of(context).primaryColor,
         title: title ?? const Text(''),
-        backgroundColor: const Color(0xFFE8F3F1),
-        foregroundColor: const Color(0xFF2D3436),
+        foregroundColor: Colors.white,
         elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.account_circle),
+            icon: const Icon(Icons.account_circle, color: Colors.white),
             onPressed: () {
               showModalBottomSheet(
                 context: context,
@@ -81,7 +87,7 @@ class AppScaffold extends StatelessWidget {
           highlightColor: Colors.transparent,
         ),
         child: BottomNavBar(
-          currentIndex: currentIndex,
+          currentIndex: adjustedIndex,
           onTap: onNavigationItemSelected,
         ),
       ) : null,

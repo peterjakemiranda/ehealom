@@ -12,13 +12,9 @@ class AppointmentService {
   late final http.Client _client;
 
   AppointmentService() {
-    if (kDebugMode) {
-      final httpClient = HttpClient()
-        ..badCertificateCallback = ((cert, host, port) => true);
-      _client = IOClient(httpClient);
-    } else {
-      _client = http.Client();
-    }
+    HttpClient client = HttpClient()
+      ..badCertificateCallback = ((cert, host, port) => true);
+    _client = IOClient(client);
   }
 
   Future<Map<String, dynamic>> fetchAppointments({
@@ -27,6 +23,8 @@ class AppointmentService {
     int page = 1,
     int perPage = 10,
     bool upcoming = false,
+    String? userType,
+    String? department,
   }) async {
     try {
       final token = await _authService.getToken();
@@ -38,6 +36,8 @@ class AppointmentService {
         if (status != null) 'status': status,
         if (date != null) 'date': date,
         if (upcoming) 'upcoming': 'true',
+        if (userType != null && userType != 'all') 'user_type': userType,
+        if (department != null) 'department': department,
       };
 
       final url = Uri.parse('${ApiConfig.baseUrl}/appointments').replace(
@@ -230,6 +230,94 @@ class AppointmentService {
     } catch (e, stackTrace) {
       debugPrint('❌ Error fetching appointment counts: $e');
       debugPrint('❌ Stack trace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  Future<void> updateStatus(String appointmentUuid, String status) async {
+    try {
+      debugPrint('📤 Updating appointment status - UUID: $appointmentUuid, New Status: $status');
+      final token = await _authService.getToken();
+      if (token == null) throw Exception('No authentication token found');
+
+      final response = await _client.put(
+        Uri.parse('${ApiConfig.baseUrl}/appointments/$appointmentUuid'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'status': status,
+        }),
+      );
+
+      debugPrint('📥 Update Status Response Code: ${response.statusCode}');
+      debugPrint('📥 Update Status Response Body: ${response.body}');
+
+      if (response.statusCode != 200) {
+        final error = jsonDecode(response.body);
+        throw Exception(error['message'] ?? 'Failed to update appointment status');
+      }
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error updating appointment status: $e');
+      debugPrint('❌ Stack trace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> searchStudents(String query) async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null) throw Exception('No authentication token found');
+
+      final response = await _client.get(
+        Uri.parse('${ApiConfig.baseUrl}/users/search-students').replace(
+          queryParameters: {'query': query},
+        ),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return List<Map<String, dynamic>>.from(data);
+      } else {
+        throw Exception('Failed to search students: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('❌ Error searching students: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<String>> getDepartments() async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null) throw Exception('No token found');
+
+      debugPrint('🔍 Fetching departments...');
+      final response = await _client.get(
+        Uri.parse('${ApiConfig.baseUrl}/appointments/departments'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      );
+
+      debugPrint('📥 Departments Response Status: ${response.statusCode}');
+      debugPrint('📥 Departments Response Body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.map((dept) => dept.toString()).toList();
+      } else {
+        throw Exception('Failed to load departments: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('❌ Error fetching departments: $e');
       rethrow;
     }
   }

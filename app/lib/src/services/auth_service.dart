@@ -12,13 +12,9 @@ class AuthService {
   final _storage = const FlutterSecureStorage();
 
   AuthService() {
-    if (kDebugMode) {
-      final httpClient = HttpClient()
-        ..badCertificateCallback = ((cert, host, port) => true); // Accept all certificates in debug
-      _client = IOClient(httpClient);
-    } else {
-      _client = http.Client();
-    }
+    HttpClient client = HttpClient()
+      ..badCertificateCallback = ((cert, host, port) => true);
+    _client = IOClient(client);
   }
 
   Future<Map<String, dynamic>> login(String email, String password) async {
@@ -48,7 +44,7 @@ class AuthService {
     } catch (e) {
       debugPrint('Login Error: $e');
       if (e is SocketException) {
-        throw Exception('Cannot connect to campus-emergency.io - Please check your connection');
+        throw Exception('Cannot connect to ${ApiConfig.baseUrl} - Please check your connection');
       }
       if (e is HandshakeException) {
         throw Exception('SSL Error - Please ensure you have the proper certificates installed');
@@ -146,31 +142,34 @@ class AuthService {
     'Authorization': 'Bearer $token',
   };
 
-  Future<void> register({
-    required String name,
-    required String email,
-    required String password,
-    required String passwordConfirmation,
-    required String userType,
-  }) async {
+  Future<Map<String, dynamic>> register(Map<String, dynamic> userData) async {
     try {
+      debugPrint('🚀 AuthService: Starting registration with data: $userData');
+      
       final response = await _client.post(
         Uri.parse(ApiConfig.register),
         headers: _headers,
-        body: jsonEncode({
-          'name': name,
-          'email': email,
-          'password': password,
-          'password_confirmation': passwordConfirmation,
-          'user_type': userType,
-        }),
+        body: jsonEncode(userData),
       );
+
+      debugPrint('📥 AuthService: Registration response status: ${response.statusCode}');
+      debugPrint('📥 AuthService: Registration response body: ${response.body}');
 
       if (response.statusCode != 200) {
         throw Exception('Registration failed: ${response.body}');
       }
+
+      final data = jsonDecode(response.body);
+      
+      // Save token immediately after successful registration
+      if (data['token'] != null) {
+        debugPrint('🔑 AuthService: Saving token after registration');
+        await _saveToken(data['token']);
+      }
+
+      return data;
     } catch (e) {
-      debugPrint('Register Error: $e');
+      debugPrint('❌ AuthService: Register Error: $e');
       rethrow;
     }
   }

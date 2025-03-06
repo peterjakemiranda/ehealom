@@ -3,6 +3,8 @@ import '../views/home/home_view.dart';
 import '../views/appointments/appointment_list_view.dart';
 import '../views/resources/resource_list_view.dart';
 import 'app_scaffold.dart';
+import '../controllers/auth_controller.dart';
+import 'package:provider/provider.dart';
 
 class BottomNavBar extends StatelessWidget {
   final int currentIndex;
@@ -16,23 +18,27 @@ class BottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final authController = context.watch<AuthController>();
+    final isCounselor = authController.user?['roles']?.contains('counselor') ?? false;
+
     return BottomNavigationBar(
       currentIndex: currentIndex,
       type: BottomNavigationBarType.fixed,
-      items: const [
-        BottomNavigationBarItem(
-          icon: Icon(Icons.home_outlined),
-          activeIcon: Icon(Icons.home),
+      backgroundColor: Theme.of(context).primaryColor,
+      selectedItemColor: Colors.white,
+      unselectedItemColor: Colors.white.withOpacity(0.6),
+      items: [
+        if (!isCounselor)
+        const BottomNavigationBarItem(
+          icon: Icon(Icons.home),
           label: 'Home',
         ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.calendar_month_outlined),
-          activeIcon: Icon(Icons.calendar_month),
+        const BottomNavigationBarItem(
+          icon: Icon(Icons.calendar_today),
           label: 'Appointments',
         ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.library_books_outlined),
-          activeIcon: Icon(Icons.library_books),
+        const BottomNavigationBarItem(
+          icon: Icon(Icons.library_books),
           label: 'Resources',
         ),
       ],
@@ -49,17 +55,17 @@ class BottomNavBar extends StatelessWidget {
   void _onNavigationTap(BuildContext context, int index) {
     if (index == currentIndex) return;
     
-    final routes = [
-      '/',
-      '/appointments',
-      '/resources',
-    ];
+    final authController = context.read<AuthController>();
+    final isCounselor = authController.user?['roles']?.contains('counselor') ?? false;
+
+    // Adjust index for counselors (who don't have home tab)
+    final adjustedIndex = isCounselor ? index + 1 : index;
 
     Navigator.pushReplacement(
       context,
       NoTransitionRoute(
         builder: (context) {
-          switch (index) {
+          switch (adjustedIndex) {
             case 0:
               return const HomeView();
             case 1:
@@ -67,7 +73,7 @@ class BottomNavBar extends StatelessWidget {
             case 2:
               return const ResourceListView();
             default:
-              return const HomeView();
+              return isCounselor ? const AppointmentListView() : const HomeView();
           }
         },
       ),

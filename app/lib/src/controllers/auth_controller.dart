@@ -85,24 +85,35 @@ class AuthController with ChangeNotifier {
     }
   }
 
-  Future<void> register({
-    required String name,
-    required String email,
-    required String password,
-    required String passwordConfirmation,
-    required String userType,
-  }) async {
+  Future<void> register(Map<String, dynamic> userData) async {
+    _isLoading = true;
+    notifyListeners();
+
     try {
-      await _authService.register(
-        name: name,
-        email: email,
-        password: password,
-        passwordConfirmation: passwordConfirmation,
-        userType: userType,
-      );
+      debugPrint('🚀 AuthController: Starting registration process');
+      final response = await _authService.register(userData);
+      
+      debugPrint('🔑 AuthController: Registration response received: $response');
+      debugPrint('💾 AuthController: Saving token: ${response['token']}');
+      _token = response['token'];
+      
+      debugPrint('👤 AuthController: Fetching user data');
+      await _fetchUser();
+      _isAuthenticated = true;
+      
+      debugPrint('✅ AuthController: Registration and login completed successfully');
+      // Broadcast auth state change
+      _authStateController.add(true);
+      
     } catch (e) {
-      debugPrint('Registration Error: $e');
+      debugPrint('❌ AuthController: Registration error - $e');
+      _isAuthenticated = false;
+      _user = null;
+      _token = null;
       rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 
@@ -156,6 +167,13 @@ class AuthController with ChangeNotifier {
     } catch (e) {
       rethrow;
     }
+  }
+
+  void _handleAuthResponse(Map<String, dynamic> response) {
+    _token = response['token'];
+    _user = response['user'];
+    _isAuthenticated = true;
+    notifyListeners();
   }
 
   @override

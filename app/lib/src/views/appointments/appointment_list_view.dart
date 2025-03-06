@@ -5,6 +5,8 @@ import '../../widgets/app_scaffold.dart';
 import 'appointment_form_view.dart';
 import 'appointment_details_sheet.dart';
 import 'dart:convert';
+import 'package:provider/provider.dart';
+import '../../controllers/auth_controller.dart';
 
 class AppointmentListView extends StatefulWidget {
   static const routeName = '/appointments';
@@ -20,6 +22,9 @@ class _AppointmentListViewState extends State<AppointmentListView> {
   List<Appointment> _appointments = [];
   bool _isLoading = false;
   String _selectedFilter = 'upcoming';
+  String _selectedUserType = 'all';
+  String? _selectedDepartment;
+  List<String> _departments = [];
   Map<String, int> _counts = {
     'upcoming': 0,
     'pending': 0,
@@ -28,11 +33,11 @@ class _AppointmentListViewState extends State<AppointmentListView> {
   };
   Map<String, dynamic> _meta = {};
 
-  // Add color map for filters
+  // Update filter colors
   final Map<String, Color> _filterColors = {
-    'upcoming': const Color(0xFF4CAF50),  // Green
+    'upcoming': const Color(0xFF1C0FD6),  // Primary blue instead of green
     'pending': const Color(0xFFFFA726),   // Orange
-    'past': const Color(0xFF42A5F5),      // Blue
+    'past': const Color(0xFF1C0FD6),      // Primary blue instead of blue
     'cancelled': const Color(0xFFEF5350),  // Red
   };
 
@@ -41,19 +46,26 @@ class _AppointmentListViewState extends State<AppointmentListView> {
     super.initState();
     _loadAppointments();
     _loadCounts();
+    _loadDepartments();
   }
 
   @override
   Widget build(BuildContext context) {
+    final authController = context.watch<AuthController>();
+    final isCounselor = authController.user?['roles']?.contains('counselor') ?? false;
+
     return AppScaffold(
       title: const Text('Appointments'),
       currentIndex: 1,
       body: Column(
         children: [
-          // Filter chips
+          // Add filters at the top for counselors
+          if (isCounselor) _buildFilters(),
+          
+          // Status filter chips
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
             child: Row(
               children: [
                 _buildFilterChip('Upcoming'),
@@ -100,6 +112,79 @@ class _AppointmentListViewState extends State<AppointmentListView> {
     } catch (e) {
       debugPrint('❌ Error loading appointment counts: $e');
     }
+  }
+
+  Future<void> _loadDepartments() async {
+    try {
+      debugPrint('🔄 Loading departments...');
+      final departments = await _appointmentService.getDepartments();
+      debugPrint('✅ Loaded departments: $departments');
+      setState(() {
+        _departments = departments;
+      });
+    } catch (e) {
+      debugPrint('❌ Error loading departments: $e');
+    }
+  }
+
+  Widget _buildFilters() {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // User Type Dropdown
+          DropdownButtonFormField<String>(
+            decoration: const InputDecoration(
+              labelText: 'Filter by User Type',
+              border: OutlineInputBorder(),
+              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            ),
+            value: _selectedUserType,
+            items: [
+              DropdownMenuItem(value: 'all', child: Text('All Users')),
+              DropdownMenuItem(value: 'student', child: Text('Students')),
+              DropdownMenuItem(value: 'personnel', child: Text('Personnel')),
+            ],
+            onChanged: (value) {
+              setState(() {
+                _selectedUserType = value!;
+                if (value != 'student') {
+                  _selectedDepartment = null;
+                }
+              });
+              _loadAppointments();
+            },
+          ),
+
+          // Department Dropdown (only show when Students are selected)
+          if (_selectedUserType == 'student') ...[
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              decoration: const InputDecoration(
+                labelText: 'Filter by Department',
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              ),
+              value: _selectedDepartment,
+              items: [
+                DropdownMenuItem(value: null, child: Text('All Departments')),
+                ..._departments.map((dept) => DropdownMenuItem(
+                  value: dept,
+                  child: Text(dept),
+                )),
+              ],
+              onChanged: (value) {
+                setState(() {
+                  _selectedDepartment = value;
+                });
+                _loadAppointments();
+              },
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   Widget _buildFilterChip(String label) {
@@ -163,6 +248,8 @@ class _AppointmentListViewState extends State<AppointmentListView> {
     try {
       final result = await _appointmentService.fetchAppointments(
         status: _selectedFilter,
+        userType: _selectedUserType != 'all' ? _selectedUserType : null,
+        department: _selectedDepartment,
       );
 
       debugPrint('Appointments Result: ${jsonEncode(result)}');
@@ -200,7 +287,14 @@ class _AppointmentListViewState extends State<AppointmentListView> {
   void _showAppointmentDetails(Appointment appointment) {
     showModalBottomSheet(
       context: context,
-      builder: (context) => AppointmentDetailsSheet(appointment: appointment),
+      builder: (context) => AppointmentDetailsSheet(
+        appointment: appointment,
+        onStatusUpdated: () {
+          // Reload appointments and counts when status is updated
+          _loadAppointments();
+          _loadCounts();
+        },
+      ),
     );
   }
 }
@@ -217,6 +311,11 @@ class _AppointmentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final authController = Provider.of<AuthController>(context);
+    final isCounselor = authController.user?['roles'].contains('counselor');
+    final canUpdateStatus = isCounselor && 
+        ['pending', 'confirmed'].contains(appointment.status.toLowerCase());
+
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       child: InkWell(
@@ -229,11 +328,25 @@ class _AppointmentCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    appointment.reason,
-                    style: Theme.of(context).textTheme.titleMedium,
+                  Expanded(
+                    child: Text(
+                      appointment.reason,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
                   ),
-                  _buildStatusChip(),
+                  Row(
+                    children: [
+                      _buildStatusChip(),
+                      if (canUpdateStatus) ...[
+                        const SizedBox(width: 8),
+                        PopupMenuButton<String>(
+                          icon: const Icon(Icons.more_vert),
+                          onSelected: (String status) => _updateStatus(context, status),
+                          itemBuilder: (BuildContext context) => _buildStatusMenuItems(),
+                        ),
+                      ],
+                    ],
+                  ),
                 ],
               ),
               const SizedBox(height: 8),
@@ -263,6 +376,60 @@ class _AppointmentCard extends StatelessWidget {
     );
   }
 
+  List<PopupMenuEntry<String>> _buildStatusMenuItems() {
+    final List<PopupMenuEntry<String>> items = [];
+    
+    if (appointment.status.toLowerCase() == 'pending') {
+      items.addAll([
+        const PopupMenuItem(
+          value: 'confirmed',
+          child: Text('Confirm Appointment'),
+        ),
+        const PopupMenuItem(
+          value: 'cancelled',
+          child: Text('Cancel Appointment'),
+        ),
+      ]);
+    } else if (appointment.status.toLowerCase() == 'confirmed') {
+      items.addAll([
+        const PopupMenuItem(
+          value: 'completed',
+          child: Text('Mark as Completed'),
+        ),
+        const PopupMenuItem(
+          value: 'cancelled',
+          child: Text('Cancel Appointment'),
+        ),
+      ]);
+    }
+    
+    return items;
+  }
+
+  Future<void> _updateStatus(BuildContext context, String newStatus) async {
+    try {
+      final appointmentService = AppointmentService();
+      await appointmentService.updateStatus(
+        appointment.id,
+        newStatus,
+      );
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Appointment ${newStatus.toLowerCase()} successfully')),
+      );
+      
+      // Find the nearest AppointmentListView state and refresh
+      final listViewState = context.findAncestorStateOfType<_AppointmentListViewState>();
+      listViewState?._loadAppointments();
+      listViewState?._loadCounts();
+      
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update appointment: $e')),
+      );
+    }
+  }
+
   Widget _buildStatusChip() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -286,11 +453,11 @@ class _AppointmentCard extends StatelessWidget {
       case 'pending':
         return Colors.orange;
       case 'confirmed':
-        return Colors.green;
+        return const Color(0xFF1C0FD6);  // Primary blue instead of green
       case 'cancelled':
         return Colors.red;
       case 'completed':
-        return Colors.blue;
+        return const Color(0xFF1C0FD6);  // Primary blue instead of blue
       default:
         return Colors.grey;
     }

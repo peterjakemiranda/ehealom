@@ -203,7 +203,7 @@ class _HomeViewState extends State<HomeView> {
             const SizedBox(height: 16),
             Card(
               elevation: 0,
-              color: const Color(0xFFE8F3F1),
+              color: Theme.of(context).primaryColor.withOpacity(0.85),
               margin: EdgeInsets.zero,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -217,16 +217,23 @@ class _HomeViewState extends State<HomeView> {
                       'Need someone to talk to?',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       'Book an appointment with your counselor',
-                      style: Theme.of(context).textTheme.bodyMedium,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.white.withOpacity(0.9),
+                      ),
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton.icon(
                       onPressed: _createAppointment,
+                      style: ElevatedButton.styleFrom(
+                        primary: Colors.white,
+                        onPrimary: Theme.of(context).primaryColor,
+                      ),
                       icon: const Icon(Icons.add),
                       label: const Text('Book Appointment'),
                     ),
@@ -265,7 +272,7 @@ class _HomeViewState extends State<HomeView> {
           const SizedBox(height: 12),
           Card(
             elevation: 0,
-            color: const Color(0xFFE8F3F1),
+            color: Theme.of(context).primaryColor.withOpacity(0.85),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
@@ -294,13 +301,14 @@ class _HomeViewState extends State<HomeView> {
                               nextAppointment.counselor?['name'] ?? 'Counselor',
                               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.bold,
+                                color: Colors.white,
                               ),
                             ),
                             const SizedBox(height: 4),
                             Text(
                               'Counselor',
                               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: Colors.grey[600],
+                                color: Colors.white.withOpacity(0.9),
                               ),
                             ),
                           ],
@@ -311,24 +319,34 @@ class _HomeViewState extends State<HomeView> {
                   const SizedBox(height: 16),
                   Row(
                     children: [
-                      const Icon(Icons.calendar_today, size: 20),
+                      Icon(Icons.calendar_today, 
+                        size: 20,
+                        color: Colors.white,
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         _formatDate(nextAppointment.appointmentDate),
-                        style: Theme.of(context).textTheme.bodyLarge,
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: Colors.white,
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      const Icon(Icons.location_on, size: 20),
+                      Icon(Icons.location_on, 
+                        size: 20,
+                        color: Colors.white,
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         nextAppointment.locationType == 'online'
                             ? 'Online'
                             : nextAppointment.location ?? 'On-site',
-                        style: Theme.of(context).textTheme.bodyLarge,
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: Colors.white,
+                        ),
                       ),
                     ],
                   ),
@@ -432,7 +450,8 @@ class _HomeViewState extends State<HomeView> {
 
     return Card(
       clipBehavior: Clip.antiAlias,
-      elevation: 2,
+      elevation: 0,
+      color: Theme.of(context).primaryColor.withOpacity(0.85),
       child: InkWell(
         onTap: () {
           debugPrint('Navigating to resource: ${resource.uuid}');
@@ -480,6 +499,7 @@ class _HomeViewState extends State<HomeView> {
                       resource.title,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -487,7 +507,9 @@ class _HomeViewState extends State<HomeView> {
                     const SizedBox(height: 4),
                     Text(
                       resource.content,
-                      style: Theme.of(context).textTheme.bodyMedium,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.white.withOpacity(0.9),
+                      ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),

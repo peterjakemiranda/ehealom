@@ -25,11 +25,15 @@ class User extends Authenticatable
         'email',
         'password',
         'status',
+        'age',
+        'sex',
+        'marital_status',
         'student_id',
+        'year_level',
         'department',
         'course',
-        'year_level',
-        'phone',
+        'major',
+        'academic_rank',
         'is_active'
     ];
 

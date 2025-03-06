@@ -79,6 +79,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // Appointment routes
     Route::get('/appointments/counts', [AppointmentController::class, 'getCounts']);
     Route::get('/appointments/available-slots', [AppointmentController::class, 'getAvailableSlots']);
+    Route::get('/appointments/departments', [AppointmentController::class, 'getDepartments']);
     Route::apiResource('appointments', AppointmentController::class)->parameters([
         'appointments' => 'appointment:uuid'
     ]);

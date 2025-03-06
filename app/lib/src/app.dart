@@ -34,20 +34,20 @@ class MyApp extends StatelessWidget {
           return MaterialApp(
             title: 'Your App',
             theme: ThemeData(
-              primaryColor: const Color(0xFF7C9A92), // Soft sage green
-              primarySwatch: MaterialColor(0xFF7C9A92, {
-                50: const Color(0xFFEDF1F0),
-                100: const Color(0xFFD1DCD9),
-                200: const Color(0xFFB3C5C0),
-                300: const Color(0xFF94AEA7),
-                400: const Color(0xFF7C9A92),
-                500: const Color(0xFF64867D),
-                600: const Color(0xFF5C7B73),
-                700: const Color(0xFF526E66),
-                800: const Color(0xFF48625A),
-                900: const Color(0xFF364B44),
+              primaryColor: const Color(0xFF0F3DD6),
+              primarySwatch: MaterialColor(0xFF0F3DD6, {
+                50: const Color(0xFFE8EDF9),  // Lightest shade
+                100: const Color(0xFFC2D1F0),
+                200: const Color(0xFF99B3E7),
+                300: const Color(0xFF7095DE),
+                400: const Color(0xFF527ED8),
+                500: const Color(0xFF0F3DD6),  // Primary color
+                600: const Color(0xFF0D37C1),
+                700: const Color(0xFF0B2FA7),
+                800: const Color(0xFF09278D),
+                900: const Color(0xFF061960),  // Darkest shade
               }),
-              scaffoldBackgroundColor: const Color(0xFFF5F6F8), // Light gray background
+              scaffoldBackgroundColor: const Color(0xFFF8F9FE), // Light blue-tinted background
               cardTheme: CardTheme(
                 elevation: 0,
                 shape: RoundedRectangleBorder(
@@ -55,24 +55,9 @@ class MyApp extends StatelessWidget {
                 ),
                 color: Colors.white,
               ),
-              elevatedButtonTheme: ElevatedButtonThemeData(
-                style: ButtonStyle(
-                  elevation: MaterialStateProperty.all(0),
-                  padding: MaterialStateProperty.all(
-                    const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                  ),
-                  shape: MaterialStateProperty.all(
-                    RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                  ),
-                  backgroundColor: MaterialStateProperty.all(const Color(0xFF7C9A92)),
-                  foregroundColor: MaterialStateProperty.all(Colors.white),
-                ),
-              ),
               textButtonTheme: TextButtonThemeData(
                 style: ButtonStyle(
-                  foregroundColor: MaterialStateProperty.all(const Color(0xFF7C9A92)),
+                  foregroundColor: MaterialStateProperty.all(const Color(0xFF1C0FD6)),
                   shape: MaterialStateProperty.all(
                     RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(30),
@@ -93,7 +78,7 @@ class MyApp extends StatelessWidget {
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFF7C9A92)),
+                  borderSide: const BorderSide(color: Color(0xFF1C0FD6)),
                 ),
                 contentPadding: const EdgeInsets.all(16),
               ),
@@ -101,24 +86,50 @@ class MyApp extends StatelessWidget {
                 titleLarge: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF2D3436),
+                  color: Color(0xFF1A1F36), // Dark text for headings
                 ),
                 titleMedium: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w500,
-                  color: Color(0xFF2D3436),
+                  color: Color(0xFF1A1F36),
                 ),
                 bodyLarge: TextStyle(
                   fontSize: 16,
-                  color: Color(0xFF636E72),
+                  color: Color(0xFF4A5578), // Slightly lighter for body text
                 ),
                 bodyMedium: TextStyle(
                   fontSize: 14,
-                  color: Color(0xFF636E72),
+                  color: Color(0xFF4A5578),
+                ),
+              ),
+              primaryTextTheme: const TextTheme(
+                titleLarge: TextStyle(color: Colors.white),
+                titleMedium: TextStyle(color: Colors.white),
+                titleSmall: TextStyle(color: Colors.white),
+              ),
+              elevatedButtonTheme: ElevatedButtonThemeData(
+                style: ButtonStyle(
+                  elevation: MaterialStateProperty.all(0),
+                  padding: MaterialStateProperty.all(
+                    const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                  ),
+                  shape: MaterialStateProperty.all(
+                    RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                  ),
+                  backgroundColor: MaterialStateProperty.all(const Color(0xFF1C0FD6)),
+                  foregroundColor: MaterialStateProperty.all(Colors.white),
                 ),
               ),
             ),
-            darkTheme: ThemeData.dark(),
+            darkTheme: ThemeData.dark().copyWith(
+              primaryColor: const Color(0xFF1C0FD6),
+              colorScheme: const ColorScheme.dark(
+                primary: Color(0xFF1C0FD6),
+                secondary: Color(0xFF5952D8),
+              ),
+            ),
             themeMode: settingsController.themeMode,
             home: Builder(
               builder: (context) {
@@ -133,7 +144,11 @@ class MyApp extends StatelessWidget {
                       return const LoginView();
                     }
 
-                    return const HomeView();
+                    // Check if user is a counselor
+                    final isCounselor = authController.user?['roles']?.contains('counselor') ?? false;
+                    return isCounselor 
+                        ? const AppointmentListView() 
+                        : const HomeView();
                   },
                 );
               },
@@ -166,3 +181,4 @@ class MyApp extends StatelessWidget {
     );
   }
 }
+

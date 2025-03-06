@@ -17,10 +17,19 @@ class _RegisterViewState extends State<RegisterView> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _ageController = TextEditingController();
+  final _studentIdController = TextEditingController();
+  final _departmentController = TextEditingController();
+  final _courseController = TextEditingController();
+  final _majorController = TextEditingController();
+  final _yearLevelController = TextEditingController();
+  final _academicRankController = TextEditingController();
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   String _selectedUserType = 'student'; // changed from 'citizen'
+  String _selectedSex = 'male';
+  String _selectedMaritalStatus = 'single';
 
   @override
   void dispose() {
@@ -28,6 +37,13 @@ class _RegisterViewState extends State<RegisterView> {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _ageController.dispose();
+    _studentIdController.dispose();
+    _departmentController.dispose();
+    _courseController.dispose();
+    _majorController.dispose();
+    _yearLevelController.dispose();
+    _academicRankController.dispose();
     super.dispose();
   }
 
@@ -37,21 +53,39 @@ class _RegisterViewState extends State<RegisterView> {
     setState(() => _isLoading = true);
 
     try {
-      await context.read<AuthController>().register(
-        name: _nameController.text,
-        email: _emailController.text,
-        password: _passwordController.text,
-        passwordConfirmation: _confirmPasswordController.text,
-        userType: _selectedUserType,
-      );
+      final Map<String, dynamic> userData = {
+        'name': _nameController.text,
+        'email': _emailController.text,
+        'password': _passwordController.text,
+        'password_confirmation': _confirmPasswordController.text,
+        'user_type': _selectedUserType,
+        'age': int.parse(_ageController.text),
+        'sex': _selectedSex,
+        'marital_status': _selectedMaritalStatus,
+      };
+
+      // Add role-specific fields
+      if (_selectedUserType == 'student') {
+        userData.addAll({
+          'student_id': _studentIdController.text,
+          'year_level': _yearLevelController.text,
+          'department': _departmentController.text,
+          'course': _courseController.text,
+          'major': _majorController.text,
+        });
+      } else if (_selectedUserType == 'personnel') {
+        userData.addAll({
+          'academic_rank': _academicRankController.text,
+          'department': _departmentController.text,
+        });
+      }
+
+      await context.read<AuthController>().register(userData);
       
       if (!mounted) return;
       
-      // Show success message and navigate back to login
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Registration successful! Please login.')),
-      );
-      Navigator.pop(context);
+      // Navigate to home instead of showing login message
+      Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -93,19 +127,13 @@ class _RegisterViewState extends State<RegisterView> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 80),
-              Image.asset(
-                'assets/images/logo.png',
-                height: 50,
-                fit: BoxFit.contain,
-              ),
               const SizedBox(height: 8),
               Text(
                 'Join our wellness community',
                 style: Theme.of(context).textTheme.bodyLarge,
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 48),
+              const SizedBox(height: 24),
               Form(
                 key: _formKey,
                 child: Column(
@@ -119,13 +147,168 @@ class _RegisterViewState extends State<RegisterView> {
                         border: OutlineInputBorder(),
                         prefixIcon: Icon(Icons.person),
                       ),
+                      validator: (value) => value?.isEmpty ?? true ? 'Please enter your name' : null,
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Age field
+                    TextFormField(
+                      controller: _ageController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Age',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.calendar_today),
+                      ),
                       validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your name';
-                        }
+                        if (value?.isEmpty ?? true) return 'Please enter your age';
+                        if (int.tryParse(value!) == null) return 'Please enter a valid age';
                         return null;
                       },
                     ),
+                    const SizedBox(height: 16),
+
+                    // Sex dropdown
+                    DropdownButtonFormField<String>(
+                      decoration: const InputDecoration(
+                        labelText: 'Sex',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.person_outline),
+                      ),
+                      value: _selectedSex,
+                      items: const [
+                        DropdownMenuItem(value: 'male', child: Text('Male')),
+                        DropdownMenuItem(value: 'female', child: Text('Female')),
+                        DropdownMenuItem(value: 'other', child: Text('Other')),
+                      ],
+                      onChanged: (value) => setState(() => _selectedSex = value!),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Marital Status dropdown
+                    DropdownButtonFormField<String>(
+                      decoration: const InputDecoration(
+                        labelText: 'Marital Status',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.family_restroom),
+                      ),
+                      value: _selectedMaritalStatus,
+                      items: const [
+                        DropdownMenuItem(value: 'single', child: Text('Single')),
+                        DropdownMenuItem(value: 'married', child: Text('Married')),
+                        DropdownMenuItem(value: 'divorced', child: Text('Divorced')),
+                        DropdownMenuItem(value: 'widowed', child: Text('Widowed')),
+                      ],
+                      onChanged: (value) => setState(() => _selectedMaritalStatus = value!),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // User Type selector
+                    _buildUserTypeSelector(),
+
+                    // Conditional fields based on user type
+                    if (_selectedUserType == 'student') ...[
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _studentIdController,
+                        decoration: const InputDecoration(
+                          labelText: 'Student ID',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.badge),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter your student ID';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _yearLevelController,
+                        decoration: const InputDecoration(
+                          labelText: 'Year Level',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.school),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter your year level';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _departmentController,
+                        decoration: const InputDecoration(
+                          labelText: 'Department',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.business),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter your department';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _courseController,
+                        decoration: const InputDecoration(
+                          labelText: 'Course',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.school_outlined),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter your course';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _majorController,
+                        decoration: const InputDecoration(
+                          labelText: 'Major',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.subject),
+                        ),
+                      ),
+                    ] else if (_selectedUserType == 'personnel') ...[
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _academicRankController,
+                        decoration: const InputDecoration(
+                          labelText: 'Academic Rank',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.work),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter your academic rank';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _departmentController,
+                        decoration: const InputDecoration(
+                          labelText: 'Department',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.business),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter your department';
+                          }
+                          return null;
+                        },
+                      ),
+                    ],
                     const SizedBox(height: 16),
 
                     // Email field
@@ -138,18 +321,14 @@ class _RegisterViewState extends State<RegisterView> {
                         prefixIcon: Icon(Icons.email),
                       ),
                       validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your email';
-                        }
-                        if (!value.contains('@')) {
-                          return 'Please enter a valid email';
-                        }
+                        if (value?.isEmpty ?? true) return 'Please enter your email';
+                        if (!value!.contains('@')) return 'Please enter a valid email';
                         return null;
                       },
                     ),
                     const SizedBox(height: 16),
 
-                    // Password field
+                    // Password fields
                     TextFormField(
                       controller: _passwordController,
                       obscureText: _obscurePassword,
@@ -158,23 +337,13 @@ class _RegisterViewState extends State<RegisterView> {
                         border: const OutlineInputBorder(),
                         prefixIcon: const Icon(Icons.lock),
                         suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscurePassword ? Icons.visibility : Icons.visibility_off,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _obscurePassword = !_obscurePassword;
-                            });
-                          },
+                          icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
+                          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                         ),
                       ),
                       validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter a password';
-                        }
-                        if (value.length < 8) {
-                          return 'Password must be at least 8 characters';
-                        }
+                        if (value?.isEmpty ?? true) return 'Please enter a password';
+                        if (value!.length < 8) return 'Password must be at least 8 characters';
                         return null;
                       },
                     ),
@@ -189,33 +358,17 @@ class _RegisterViewState extends State<RegisterView> {
                         border: const OutlineInputBorder(),
                         prefixIcon: const Icon(Icons.lock),
                         suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscureConfirmPassword ? Icons.visibility : Icons.visibility_off,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _obscureConfirmPassword = !_obscureConfirmPassword;
-                            });
-                          },
+                          icon: Icon(_obscureConfirmPassword ? Icons.visibility : Icons.visibility_off),
+                          onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
                         ),
                       ),
                       validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please confirm your password';
-                        }
-                        if (value != _passwordController.text) {
-                          return 'Passwords do not match';
-                        }
+                        if (value?.isEmpty ?? true) return 'Please confirm your password';
+                        if (value != _passwordController.text) return 'Passwords do not match';
                         return null;
                       },
                     ),
                     const SizedBox(height: 24),
-
-                    // Add user type selector
-                    _buildUserTypeSelector(),
-                    
-                    const SizedBox(height: 48),
-                    
 
                     // Register button
                     SizedBox(

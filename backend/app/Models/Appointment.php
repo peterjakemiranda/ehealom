@@ -15,6 +15,7 @@ class Appointment extends Model
     protected $fillable = [
         'student_id',
         'counselor_id',
+        'category_id',
         'appointment_date',
         'reason',
         'location_type',
@@ -52,5 +53,10 @@ class Appointment extends Model
     public function counselor()
     {
         return $this->belongsTo(User::class, 'counselor_id');
+    }
+
+    public function category()
+    {
+        return $this->belongsTo(Category::class);
     }
 } 

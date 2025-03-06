@@ -10,6 +10,8 @@ use Carbon\Carbon;
 use Illuminate\Support\Str;
 use App\Services\AppointmentScheduleService;
 use App\Models\User;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 
 class AppointmentController extends Controller
 {
@@ -30,14 +32,29 @@ class AppointmentController extends Controller
         $query = Appointment::query()
             ->with(['student', 'counselor']);
 
-        // Filter by user role
+        // Filter by user role first
         if ($request->user()->hasRole('student')) {
             $query->where('student_id', $request->user()->id);
         } elseif ($request->user()->hasRole('counselor')) {
             $query->where('counselor_id', $request->user()->id);
+            
+            if ($request->has('user_type') && $request->user_type !== 'all') {
+                $role = $request->user_type === 'student' ? 'student' : 'personnel';
+                Log::info('Role: ' . $role);
+                $query->whereHas('student.roles', function($q) use ($role) {
+                    $q->where('name', $role);
+                });
+
+                // Add department filter for students
+                if ($role === 'student' && $request->has('department')) {
+                    $query->whereHas('student', function($q) use ($request) {
+                        $q->where('department', $request->department);
+                    });
+                }
+            }
         }
 
-        // Apply status/date filters
+        // Then apply status/date filters
         $now = now();
         switch ($request->get('status')) {
             case 'upcoming':
@@ -48,10 +65,12 @@ class AppointmentController extends Controller
                 $query->where('status', 'pending');
                 break;
             case 'past':
-                $query->where('status', 'completed')
-                ->orWhere(function($q) use ($now) {
-                    $q->whereDate('appointment_date', '<', $now)
-                        ->where('status', 'confirmed');
+                $query->where(function($q) use ($now) {
+                    $q->where('status', 'completed')
+                        ->orWhere(function($q) use ($now) {
+                            $q->whereDate('appointment_date', '<', $now)
+                                ->where('status', 'confirmed');
+                        });
                 });
                 break;
             case 'cancelled':
@@ -96,48 +115,42 @@ class AppointmentController extends Controller
 
     public function store(Request $request)
     {
-        \Log::info('Appointment creation attempt', [
-            'user' => auth()->user(),
-            'roles' => auth()->user()->roles->pluck('name'),
-            'data' => $request->all()
-        ]);
-
         $validated = $request->validate([
-            'counselor_id' => 'required|exists:users,id',
             'appointment_date' => 'required|date|after:now',
             'reason' => 'required|string',
             'location_type' => 'required|in:online,on-site',
+            'category_id' => 'required|exists:categories,id',
+            // For new students
+            'student_name' => 'required_without:student_id|string',
+            'student_id_number' => 'required_without:student_id|string',
+            'student_email' => 'required_without:student_id|email',
+            // For existing students
+            'student_id' => 'required_without_all:student_name,student_id_number,student_email|exists:users,id',
         ]);
 
-        // Check if user is a student
-        if (!auth()->user()->hasRole('student')) {
-            return response()->json([
-                'message' => 'Only students can book appointments'
-            ], 403);
+        if (!$request->has('student_id')) {
+            // Create minimal user record for the student
+            $student = User::create([
+                'name' => $validated['student_name'],
+                'email' => $validated['student_email'],
+                'student_id' => $validated['student_id_number'],
+                'password' => Hash::make(Str::random(12)), // Random password
+                'status' => true,
+            ]);
+            $student->assignRole('student');
+            $student_id = $student->id;
+        } else {
+            $student_id = $validated['student_id'];
         }
 
-        // Check if slot is available
-        $appointmentDate = Carbon::parse($validated['appointment_date']);
-        $existingAppointment = Appointment::where('counselor_id', $validated['counselor_id'])
-            ->whereDate('appointment_date', $appointmentDate->toDateString())
-            ->whereTime('appointment_date', $appointmentDate->format('H:i:s'))
-            ->first();
-
-        if ($existingAppointment) {
-            return response()->json([
-                'message' => 'This time slot is no longer available'
-            ], 422);
-        }
-
-        // Create appointment
         $appointment = Appointment::create([
-            'student_id' => auth()->id(),
-            'counselor_id' => $validated['counselor_id'],
+            'student_id' => $student_id,
+            'counselor_id' => auth()->id(),
             'appointment_date' => $validated['appointment_date'],
             'reason' => $validated['reason'],
             'location_type' => $validated['location_type'],
-            'location' => $validated['location'] ?? '',
-            'status' => 'pending',
+            'status' => 'confirmed',
+            'category_id' => $validated['category_id'],
         ]);
 
         return new AppointmentResource($appointment);
@@ -263,6 +276,25 @@ class AppointmentController extends Controller
         return response()->json([
             'slots' => $availableSlots
         ]);
+    }
+
+    public function getDepartments()
+    {
+        // Add debug logging
+        Log::info('Fetching departments');
+        
+        $departments = User::whereHas('roles', function($q) {
+                $q->where('name', 'student');
+            })
+            ->whereNotNull('department')
+            ->distinct()
+            ->pluck('department')
+            ->values();
+        
+        // Log the results
+        Log::info('Found departments:', ['departments' => $departments]);
+
+        return response()->json($departments);
     }
 
 } 

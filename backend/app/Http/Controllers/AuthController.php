@@ -13,30 +13,68 @@ class AuthController extends Controller
 {
     public function register(Request $request)
     {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
-            'password' => 'required|string|min:8|confirmed',
-            'user_type' => 'required|string|in:student,personnel',
-        ]);
+        try {
+            $validated = $request->validate([
+                'name' => 'required|string|max:255',
+                'email' => 'required|string|email|max:255|unique:users',
+                'password' => 'required|string|min:8',
+                'password_confirmation' => 'required|same:password',
+                'user_type' => 'required|string|in:student,personnel',
+                
+                // Common fields
+                'age' => 'required|integer|min:0',
+                'sex' => 'required|string|in:male,female,other',
+                'marital_status' => 'required|string',
+                
+                // Conditional validation
+                'student_id' => 'required_if:user_type,student|nullable|string',
+                'year_level' => 'required_if:user_type,student|nullable|string',
+                'department' => 'required_if:user_type,student,personnel|nullable|string',
+                'course' => 'required_if:user_type,student|nullable|string',
+                'major' => 'nullable|string',
+                'academic_rank' => 'required_if:user_type,personnel|nullable|string',
+            ]);
 
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-            'user_type' => $request->user_type,
-        ]);
+            $user = User::create([
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+                'password' => Hash::make($validated['password']),
+                'age' => $validated['age'],
+                'sex' => $validated['sex'],
+                'marital_status' => $validated['marital_status'],
+                'student_id' => $validated['student_id'] ?? null,
+                'year_level' => $validated['year_level'] ?? null,
+                'department' => $validated['department'] ?? null,
+                'course' => $validated['course'] ?? null,
+                'major' => $validated['major'] ?? null,
+                'academic_rank' => $validated['academic_rank'] ?? null,
+            ]);
 
-        // Assign role based on user type
-        $role = $request->user_type === 'student' ? 'student' : 'personnel';
-        $user->assignRole($role);
+            // Assign role based on user type
+            $role = Role::where('name', $validated['user_type'])->first();
+            if ($role) {
+                $user->assignRole($role);
+            }
 
-        $token = $user->createToken('authToken')->plainTextToken;
+            $token = $user->createToken('authToken')->plainTextToken;
 
-        return response()->json([
-            'user' => $user,
-            'token' => $token,
-        ]);
+            return response()->json([
+                'user' => $user,
+                'token' => $token,
+            ], 200);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (\Exception $e) {
+            \Log::error('Registration error: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Registration failed',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 
     public function login(Request $request)

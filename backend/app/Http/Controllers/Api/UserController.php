@@ -63,14 +63,36 @@ class UserController extends Controller
             'password' => ['required', Password::defaults()],
             'roles' => ['required', 'array'],
             'roles.*' => ['exists:roles,name'],
-            'status' => ['sometimes', 'boolean']
+            'status' => ['sometimes', 'boolean'],
+            
+            // Common fields
+            'age' => ['sometimes', 'integer', 'min:0'],
+            'sex' => ['sometimes', 'string', 'in:male,female,other'],
+            'marital_status' => ['sometimes', 'string'],
+            
+            // Conditional validation based on role
+            'student_id' => ['required_if:roles.0,student', 'string', 'nullable'],
+            'year_level' => ['required_if:roles.0,student', 'string', 'nullable'],
+            'department' => ['required_if:roles.0,student,personnel', 'string', 'nullable'],
+            'course' => ['required_if:roles.0,student', 'string', 'nullable'],
+            'major' => ['sometimes', 'string', 'nullable'],
+            'academic_rank' => ['required_if:roles.0,personnel', 'string', 'nullable'],
         ]);
 
         $user = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
-            'status' => $validated['status'] ?? true
+            'status' => $validated['status'] ?? true,
+            'age' => $validated['age'] ?? null,
+            'sex' => $validated['sex'] ?? null,
+            'marital_status' => $validated['marital_status'] ?? null,
+            'student_id' => $validated['student_id'] ?? null,
+            'year_level' => $validated['year_level'] ?? null,
+            'department' => $validated['department'] ?? null,
+            'course' => $validated['course'] ?? null,
+            'major' => $validated['major'] ?? null,
+            'academic_rank' => $validated['academic_rank'] ?? null,
         ]);
 
         $user->assignRole($validated['roles']);
@@ -86,21 +108,33 @@ class UserController extends Controller
             'password' => ['sometimes', Password::defaults()],
             'roles' => ['sometimes', 'array'],
             'roles.*' => ['exists:roles,name'],
-            'status' => ['sometimes', 'boolean']
+            'status' => ['sometimes', 'boolean'],
+            
+            // Common fields
+            'age' => ['sometimes', 'integer', 'min:0'],
+            'sex' => ['sometimes', 'string', 'in:male,female,other'],
+            'marital_status' => ['sometimes', 'string'],
+            
+            // Role specific fields
+            'student_id' => ['sometimes', 'string', 'nullable'],
+            'year_level' => ['sometimes', 'string', 'nullable'],
+            'department' => ['sometimes', 'string', 'nullable'],
+            'course' => ['sometimes', 'string', 'nullable'],
+            'major' => ['sometimes', 'string', 'nullable'],
+            'academic_rank' => ['sometimes', 'string', 'nullable'],
         ]);
 
-        $userData = [
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'status' => $validated['status'] ?? $user->status
-        ];
+        $userData = array_merge(
+            $validated,
+            isset($validated['password']) ? ['password' => Hash::make($validated['password'])] : []
+        );
 
-        if (isset($validated['password'])) {
-            $userData['password'] = Hash::make($validated['password']);
-        }
-
+        unset($userData['roles']);
         $user->update($userData);
-        $user->syncRoles($validated['roles']);
+        
+        if (isset($validated['roles'])) {
+            $user->syncRoles($validated['roles']);
+        }
 
         return new UserResource($user->load('roles'));
     }
@@ -125,5 +159,22 @@ class UserController extends Controller
 
         $user->update(['status' => !$user->status]);
         return new UserResource($user->load('roles'));
+    }
+
+    public function searchStudents(Request $request)
+    {
+        $query = $request->get('query');
+        
+        $students = User::role('student')
+            ->where(function($q) use ($query) {
+                $q->where('name', 'like', "%{$query}%")
+                  ->orWhere('email', 'like', "%{$query}%")
+                  ->orWhere('student_id', 'like', "%{$query}%");
+            })
+            ->select('id', 'name', 'email', 'student_id')
+            ->limit(10)
+            ->get();
+
+        return response()->json($students);
     }
 }
