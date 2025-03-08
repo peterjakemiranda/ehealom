@@ -121,7 +121,6 @@ class AuthController extends Controller
         $user = $request->user();
         
         $request->validate([
-            'name' => 'required|string|max:255',
             'current_password' => 'required_with:new_password',
             'new_password' => 'nullable|min:6'
         ]);
@@ -137,6 +136,7 @@ class AuthController extends Controller
         }
 
         $user->name = $request->name;
+        $user->username = $request->username ?? null;
         $user->save();
 
         return response()->json([

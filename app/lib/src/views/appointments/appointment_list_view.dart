@@ -51,12 +51,16 @@ class _AppointmentListViewState extends State<AppointmentListView> {
 
   @override
   Widget build(BuildContext context) {
-    final authController = context.watch<AuthController>();
-    final isCounselor = authController.user?['roles']?.contains('counselor') ?? false;
-
+    final authController = Provider.of<AuthController>(context, listen: false);
+    final roles = authController.user?['user']?['roles'] as List<dynamic>?;
+    final isCounselor = roles?.any((role) => role['name'] == 'counselor') ?? false;
+    
+    // Appointments is index 0 for counselors, index 1 for regular users
+    final appointmentsIndex = isCounselor ? 0 : 1;
+    
     return AppScaffold(
       title: const Text('Appointments'),
-      currentIndex: 1,
+      currentIndex: appointmentsIndex,
       body: Column(
         children: [
           // Add filters at the top for counselors

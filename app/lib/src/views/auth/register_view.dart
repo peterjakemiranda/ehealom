@@ -88,8 +88,17 @@ class _RegisterViewState extends State<RegisterView> {
       Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
     } catch (e) {
       if (!mounted) return;
+      
+      // Extract only the message from the error
+      String errorMsg = e.toString();
+      if (errorMsg.contains('message":')) {
+        errorMsg = errorMsg.split('message":')[1]
+            .split('"')[1]
+            .replaceAll(r'\', '');
+      }
+      
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Registration failed: $e')),
+        SnackBar(content: Text(errorMsg)),
       );
     } finally {
       if (mounted) {

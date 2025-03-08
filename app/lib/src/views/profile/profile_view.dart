@@ -16,16 +16,25 @@ class _ProfileViewState extends State<ProfileView> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _usernameController = TextEditingController();
   final _currentPasswordController = TextEditingController();
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _ageController = TextEditingController();
+  final _studentIdController = TextEditingController();
+  final _departmentController = TextEditingController();
+  final _courseController = TextEditingController();
+  final _majorController = TextEditingController();
+  final _yearLevelController = TextEditingController();
+  final _academicRankController = TextEditingController();
   bool _isLoading = false;
   bool _changePassword = false;
+  String _selectedSex = 'male';
+  String _selectedMaritalStatus = 'single';
 
   @override
   void initState() {
     super.initState();
-    // Delay the initial load to ensure context is available
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadUserData();
     });
@@ -36,9 +45,20 @@ class _ProfileViewState extends State<ProfileView> {
     debugPrint('Loading user data in ProfileView: $user');
     
     if (user != null && user['user'] != null) {
+      final userData = user['user'];
       setState(() {
-        _nameController.text = user['user']['name'] ?? '';
-        _emailController.text = user['user']['email'] ?? '';
+        _nameController.text = userData['name'] ?? '';
+        _emailController.text = userData['email'] ?? '';
+        _usernameController.text = userData['username'] ?? '';
+        _ageController.text = userData['age']?.toString() ?? '';
+        _studentIdController.text = userData['student_id'] ?? '';
+        _departmentController.text = userData['department'] ?? '';
+        _courseController.text = userData['course'] ?? '';
+        _majorController.text = userData['major'] ?? '';
+        _yearLevelController.text = userData['year_level']?.toString() ?? '';
+        _academicRankController.text = userData['academic_rank'] ?? '';
+        _selectedSex = userData['sex'] ?? 'male';
+        _selectedMaritalStatus = userData['marital_status'] ?? 'single';
       });
     }
   }
@@ -60,9 +80,17 @@ class _ProfileViewState extends State<ProfileView> {
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
+    _usernameController.dispose();
     _currentPasswordController.dispose();
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
+    _ageController.dispose();
+    _studentIdController.dispose();
+    _departmentController.dispose();
+    _courseController.dispose();
+    _majorController.dispose();
+    _yearLevelController.dispose();
+    _academicRankController.dispose();
     super.dispose();
   }
 
@@ -75,9 +103,19 @@ class _ProfileViewState extends State<ProfileView> {
       await context.read<AuthController>().updateProfile(
         name: _nameController.text,
         email: _emailController.text,
+        username: _usernameController.text,
         currentPassword: _changePassword ? _currentPasswordController.text : null,
         newPassword: _changePassword ? _newPasswordController.text : null,
         newPasswordConfirmation: _changePassword ? _confirmPasswordController.text : null,
+        age: int.tryParse(_ageController.text),
+        studentId: _studentIdController.text,
+        department: _departmentController.text,
+        course: _courseController.text,
+        major: _majorController.text,
+        yearLevel: _yearLevelController.text,
+        academicRank: _academicRankController.text,
+        sex: _selectedSex,
+        maritalStatus: _selectedMaritalStatus,
       );
       
       if (!mounted) return;
@@ -86,7 +124,6 @@ class _ProfileViewState extends State<ProfileView> {
         const SnackBar(content: Text('Profile updated successfully')),
       );
 
-      // Clear password fields after successful update
       if (_changePassword) {
         _currentPasswordController.clear();
         _newPasswordController.clear();
@@ -139,8 +176,9 @@ class _ProfileViewState extends State<ProfileView> {
               TextFormField(
                 controller: _nameController,
                 decoration: const InputDecoration(
-                  labelText: 'Name',
+                  labelText: 'Full Name',
                   border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.person),
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -151,10 +189,126 @@ class _ProfileViewState extends State<ProfileView> {
               ),
               const SizedBox(height: 16),
               TextFormField(
+                controller: _usernameController,
+                decoration: const InputDecoration(
+                  labelText: 'Username',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.person_outline),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter a username';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _ageController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Age',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.calendar_today),
+                ),
+                validator: (value) {
+                  if (value?.isEmpty ?? true) return 'Please enter your age';
+                  if (int.tryParse(value!) == null) return 'Please enter a valid age';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                decoration: const InputDecoration(
+                  labelText: 'Sex',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.person_outline),
+                ),
+                value: _selectedSex,
+                items: const [
+                  DropdownMenuItem(value: 'male', child: Text('Male')),
+                  DropdownMenuItem(value: 'female', child: Text('Female')),
+                  DropdownMenuItem(value: 'other', child: Text('Other')),
+                ],
+                onChanged: (value) => setState(() => _selectedSex = value!),
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                decoration: const InputDecoration(
+                  labelText: 'Marital Status',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.family_restroom),
+                ),
+                value: _selectedMaritalStatus,
+                items: const [
+                  DropdownMenuItem(value: 'single', child: Text('Single')),
+                  DropdownMenuItem(value: 'married', child: Text('Married')),
+                  DropdownMenuItem(value: 'divorced', child: Text('Divorced')),
+                  DropdownMenuItem(value: 'widowed', child: Text('Widowed')),
+                ],
+                onChanged: (value) => setState(() => _selectedMaritalStatus = value!),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _studentIdController,
+                decoration: const InputDecoration(
+                  labelText: 'Student ID',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.badge),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _yearLevelController,
+                decoration: const InputDecoration(
+                  labelText: 'Year Level',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.school),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _departmentController,
+                decoration: const InputDecoration(
+                  labelText: 'Department',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.business),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _courseController,
+                decoration: const InputDecoration(
+                  labelText: 'Course',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.school_outlined),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _majorController,
+                decoration: const InputDecoration(
+                  labelText: 'Major',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.subject),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _academicRankController,
+                decoration: const InputDecoration(
+                  labelText: 'Academic Rank',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.work),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
                 controller: _emailController,
                 decoration: const InputDecoration(
                   labelText: 'Email',
                   border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.email),
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -181,6 +335,7 @@ class _ProfileViewState extends State<ProfileView> {
                   decoration: const InputDecoration(
                     labelText: 'Current Password',
                     border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.lock),
                   ),
                   obscureText: true,
                   validator: (value) {
@@ -196,6 +351,7 @@ class _ProfileViewState extends State<ProfileView> {
                   decoration: const InputDecoration(
                     labelText: 'New Password',
                     border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.lock_outline),
                   ),
                   obscureText: true,
                   validator: (value) {
@@ -216,6 +372,7 @@ class _ProfileViewState extends State<ProfileView> {
                   decoration: const InputDecoration(
                     labelText: 'Confirm New Password',
                     border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.lock_outline),
                   ),
                   obscureText: true,
                   validator: (value) {

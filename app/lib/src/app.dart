@@ -13,6 +13,7 @@ import 'views/resources/resource_details_view.dart';
 import 'settings/settings_controller.dart';
 import 'settings/settings_view.dart';
 import 'views/home/home_view.dart';
+import 'views/chat/chat_view.dart';
 
 /// The Widget that configures your application.
 class MyApp extends StatelessWidget {
@@ -174,6 +175,7 @@ class MyApp extends StatelessWidget {
               '/appointment_form': (context) => const AppointmentFormView(),
               '/resources': (context) => const ResourceListView(),
               '/settings': (context) => SettingsView(controller: settingsController),
+              '/chat': (context) => const ChatView(),
             },
           );
         },

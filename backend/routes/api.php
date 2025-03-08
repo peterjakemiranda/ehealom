@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\AlertController;
 use App\Http\Controllers\Api\ResourceController;
 use App\Http\Controllers\Api\AppointmentController;
 use App\Http\Controllers\Api\CounselorScheduleController;
+use App\Http\Controllers\Api\ChatController;
 
 /*
 |--------------------------------------------------------------------------
@@ -91,4 +92,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::post('excluded-dates', [CounselorScheduleController::class, 'updateExcludedDates']);
         Route::delete('excluded-dates/{id}', [CounselorScheduleController::class, 'deleteExcludedDate']);
     });
+
+    // Chat routes
+    Route::get('/chat/messages', [ChatController::class, 'index']);
+    Route::post('/chat/messages', [ChatController::class, 'store']);
 });

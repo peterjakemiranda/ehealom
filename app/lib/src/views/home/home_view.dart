@@ -140,22 +140,12 @@ class _HomeViewState extends State<HomeView> {
 
   @override
   Widget build(BuildContext context) {
-    final user = context.watch<AuthController>().user;
-    final userName = user?['user']?['name']?.split(' ')[0] ?? 'there';
-
+    // Home is only for regular users, always index 0
+    // Counselors don't see this view
+    
     return AppScaffold(
-      title: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Image.asset(
-            'assets/images/logo.png',
-            height: 30,
-            fit: BoxFit.contain,
-          ),
-        ],
-      ),
+      title: const Text('Home'),
       currentIndex: 0,
-      hideBackButton: true,
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
@@ -167,7 +157,7 @@ class _HomeViewState extends State<HomeView> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildWelcomeSection(userName),
+                        _buildWelcomeSection(context.watch<AuthController>().user?['user']?['name']?.split(' ')[0] ?? 'there'),
                         if (_upcomingAppointments.isNotEmpty)
                           _buildUpcomingAppointment(),
                         _buildWellnessResources(),

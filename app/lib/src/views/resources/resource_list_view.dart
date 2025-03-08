@@ -4,6 +4,8 @@ import '../../services/resource_service.dart';
 import '../../widgets/app_scaffold.dart';
 import 'resource_details_view.dart';
 import 'dart:convert';
+import 'package:provider/provider.dart';
+import '../../controllers/auth_controller.dart';
 
 class ResourceListView extends StatefulWidget {
   static const routeName = '/resources';
@@ -78,9 +80,17 @@ class _ResourceListViewState extends State<ResourceListView> {
 
   @override
   Widget build(BuildContext context) {
+    // Get the auth controller to check user role
+    final authController = Provider.of<AuthController>(context, listen: false);
+    final roles = authController.user?['user']?['roles'] as List<dynamic>?;
+    final isCounselor = roles?.any((role) => role['name'] == 'counselor') ?? false;
+    
+    // Resources is index 1 for counselors, index 2 for regular users
+    final resourcesIndex = isCounselor ? 1 : 2;
+    
     return AppScaffold(
       title: const Text('Resources'),
-      currentIndex: 2,
+      currentIndex: resourcesIndex,
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(

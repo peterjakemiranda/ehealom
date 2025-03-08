@@ -32,34 +32,36 @@ class _LoginViewState extends State<LoginView> {
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
 
-    debugPrint('LoginView: Starting login process');
-    if (!mounted) return;
-    
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
     try {
-      debugPrint('LoginView: Attempting login with email: ${_emailController.text}');
       await context.read<AuthController>().login(
         _emailController.text,
         _passwordController.text,
       );
-      debugPrint('LoginView: Login successful');
       
       if (!mounted) return;
       
-      // Add navigation after successful login
       WidgetsBinding.instance.addPostFrameCallback((_) {
         Navigator.of(context).pushReplacementNamed('/home');
       });
       
     } catch (e) {
-      debugPrint('LoginView: Login error - $e');
       if (!mounted) return;
+      
+      // Extract only the message from the error
+      String errorMsg = e.toString();
+      if (errorMsg.contains('message":')) {
+        errorMsg = errorMsg.split('message":')[1]
+            .split('"')[1]
+            .replaceAll(r'\', '');
+      }
+      
       setState(() {
-        _errorMessage = e.toString();
+        _errorMessage = errorMsg;
         _isLoading = false;
       });
     }

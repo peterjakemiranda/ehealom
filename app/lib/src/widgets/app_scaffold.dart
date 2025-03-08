@@ -28,10 +28,10 @@ class AppScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final authController = context.watch<AuthController>();
-    final isCounselor = authController.user?['roles']?.contains('counselor') ?? false;
+    final roles = authController.user?['user']?['roles'] as List<dynamic>?;
+    final isCounselor = roles?.any((role) => role['name'] == 'counselor') ?? false;
     
-    // Adjust currentIndex for counselors since they don't have the home tab
-    final adjustedIndex = isCounselor && currentIndex > 0 ? currentIndex - 1 : currentIndex;
+    // No need to adjust the index - we'll pass the correct index from each view
 
     return Scaffold(
       appBar: AppBar(
@@ -87,7 +87,7 @@ class AppScaffold extends StatelessWidget {
           highlightColor: Colors.transparent,
         ),
         child: BottomNavBar(
-          currentIndex: adjustedIndex,
+          currentIndex: currentIndex,
           onTap: onNavigationItemSelected,
         ),
       ) : null,

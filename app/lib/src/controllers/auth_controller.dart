@@ -143,28 +143,54 @@ class AuthController with ChangeNotifier {
   }
 
   Future<void> updateProfile({
-    required String name,
-    required String email,
+    String? name,
+    String? email,
+    String? username,
     String? currentPassword,
     String? newPassword,
     String? newPasswordConfirmation,
+    int? age,
+    String? studentId,
+    String? department,
+    String? course,
+    String? major,
+    String? yearLevel,
+    String? academicRank,
+    String? sex,
+    String? maritalStatus,
   }) async {
     try {
       final Map<String, dynamic> data = {
-        'name': name,
-        'email': email,
+        if (name != null) 'name': name,
+        if (email != null) 'email': email,
+        if (username != null) 'username': username,
+        if (currentPassword != null) 'current_password': currentPassword,
+        if (newPassword != null) 'new_password': newPassword,
+        if (newPasswordConfirmation != null) 'new_password_confirmation': newPasswordConfirmation,
+        if (age != null) 'age': age,
+        if (studentId != null) 'student_id': studentId,
+        if (department != null) 'department': department,
+        if (course != null) 'course': course,
+        if (major != null) 'major': major,
+        if (yearLevel != null) 'year_level': yearLevel,
+        if (academicRank != null) 'academic_rank': academicRank,
+        if (sex != null) 'sex': sex,
+        if (maritalStatus != null) 'marital_status': maritalStatus,
       };
-
-      if (currentPassword != null && newPassword != null) {
-        data['current_password'] = currentPassword;
-        data['new_password'] = newPassword;
-        data['new_password_confirmation'] = newPasswordConfirmation;
-      }
 
       final response = await _authService.updateProfile(data);
       _user = response['user'];
       notifyListeners();
     } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<void> refreshUserData() async {
+    try {
+      await _fetchUser();
+    } catch (e) {
+      debugPrint('Error refreshing user data: $e');
       rethrow;
     }
   }
