@@ -57,8 +57,11 @@ class AppointmentController extends Controller
         switch ($request->get('status')) {
             case 'upcoming':
                 $query->where(function($q) use ($now) {
-                    $q->where('status', 'confirmed')
-                        ->whereDate('appointment_date', '>=', $now);
+                    $q->where(function($q) {
+                        $q->where('status', 'confirmed')
+                            ->orWhere('status', 'pending');
+                    })
+                    ->whereDate('appointment_date', '>=', $now);
                 });
                 break;
             case 'history':
