@@ -37,7 +37,7 @@ class AppointmentScheduleService
             return [
                 'slots' => [],
                 'is_excluded' => true,
-                'reason' => $excludedDate->reason ?? 'This date is excluded from appointments'
+                'reason' => $excludedDate->reason
             ];
         }
 
