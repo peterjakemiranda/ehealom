@@ -172,7 +172,7 @@ class AppointmentController extends Controller
             'appointment_date' => $validated['appointment_date'],
             'reason' => $validated['reason'],
             'location_type' => $validated['location_type'],
-            'status' => 'confirmed',
+            'status' => $request->user()->hasRole('counselor') ? 'confirmed' : 'pending',
             'category_id' => $validated['category_id'],
         ]);
 

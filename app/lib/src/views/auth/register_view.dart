@@ -14,6 +14,7 @@ class RegisterView extends StatefulWidget {
 class _RegisterViewState extends State<RegisterView> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
+  final _usernameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
@@ -34,6 +35,7 @@ class _RegisterViewState extends State<RegisterView> {
   @override
   void dispose() {
     _nameController.dispose();
+    _usernameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
@@ -55,6 +57,7 @@ class _RegisterViewState extends State<RegisterView> {
     try {
       final Map<String, dynamic> userData = {
         'name': _nameController.text,
+        'username': _usernameController.text,
         'email': _emailController.text,
         'password': _passwordController.text,
         'password_confirmation': _confirmPasswordController.text,
@@ -157,6 +160,18 @@ class _RegisterViewState extends State<RegisterView> {
                         prefixIcon: Icon(Icons.person),
                       ),
                       validator: (value) => value?.isEmpty ?? true ? 'Please enter your name' : null,
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Username field
+                    TextFormField(
+                      controller: _usernameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Username',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.person_outline),
+                      ),
+                      validator: (value) => value?.isEmpty ?? true ? 'Please enter a username' : null,
                     ),
                     const SizedBox(height: 16),
 
