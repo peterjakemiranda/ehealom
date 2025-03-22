@@ -278,14 +278,12 @@ class AppointmentController extends Controller
         }
 
         // Use the schedule service to get available slots
-        $slots = $this->scheduleService->getAvailableSlots(
+        $result = $this->scheduleService->getAvailableSlots(
             $request->counselor_id,
             $request->date
         );
 
-        return response()->json([
-            'slots' => $slots
-        ]);
+        return response()->json($result);
     }
 
     public function getDepartments()

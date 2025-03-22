@@ -339,10 +339,103 @@ class _ChatViewState extends State<ChatView> {
   }
 
   Widget _buildChatBubble(Map<String, dynamic> message) {
-    return _ChatBubble(
-      message: message['message'],
-      username: message['user']['username'] ?? message['user']['name'],
-      timestamp: DateTime.parse(message['created_at']),
+    final authController = Provider.of<AuthController>(context, listen: false);
+    final currentUserId = authController.user?['user']['id'];
+    final isOwnMessage = message['user']['id'] == currentUserId;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: isOwnMessage ? MainAxisAlignment.end : MainAxisAlignment.start,
+        children: [
+          if (!isOwnMessage) ...[
+            CircleAvatar(
+              radius: 16,
+              backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
+              child: Text(
+                (message['user']['username'] ?? message['user']['name']).substring(0, 1).toUpperCase(),
+                style: TextStyle(
+                  color: Theme.of(context).primaryColor,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
+          Flexible(
+            child: Column(
+              crossAxisAlignment: isOwnMessage ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              children: [
+                if (!isOwnMessage) ...[
+                  Text(
+                    message['user']['username'] ?? message['user']['name'],
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                ],
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isOwnMessage 
+                        ? Theme.of(context).primaryColor
+                        : Theme.of(context).primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        message['message'],
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: isOwnMessage ? Colors.white : Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _formatTimestamp(DateTime.parse(message['created_at'])),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isOwnMessage 
+                              ? Colors.white.withOpacity(0.8)
+                              : Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (isOwnMessage) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    message['user']['username'] ?? message['user']['name'],
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (isOwnMessage) ...[
+            const SizedBox(width: 8),
+            CircleAvatar(
+              radius: 16,
+              backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
+              child: Text(
+                (message['user']['username'] ?? message['user']['name']).substring(0, 1).toUpperCase(),
+                style: TextStyle(
+                  color: Theme.of(context).primaryColor,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
@@ -387,71 +480,6 @@ class _AliasDialogState extends State<_AliasDialog> {
         ),
       ],
     );
-  }
-}
-
-class _ChatBubble extends StatelessWidget {
-  final String message;
-  final String username;
-  final DateTime timestamp;
-
-  const _ChatBubble({
-    required this.message,
-    required this.username,
-    required this.timestamp,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            username,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 12,
-            ),
-          ),
-          Container(
-            margin: const EdgeInsets.only(top: 4),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Theme.of(context).primaryColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(message),
-                const SizedBox(height: 4),
-                Text(
-                  _formatTimestamp(timestamp),
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: Colors.grey[600],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _formatTimestamp(DateTime timestamp) {
-    // Convert to Manila timezone (UTC+8)
-    final manilaTime = timestamp.toUtc().add(const Duration(hours: 8));
-    
-    // Format hour in 12-hour format with AM/PM
-    final hour = manilaTime.hour > 12 ? manilaTime.hour - 12 : (manilaTime.hour == 0 ? 12 : manilaTime.hour);
-    final minute = manilaTime.minute.toString().padLeft(2, '0');
-    final period = manilaTime.hour >= 12 ? 'PM' : 'AM';
-    
-    return '$hour:$minute $period';
   }
 }
 
@@ -515,4 +543,16 @@ class _UsernameDialogState extends State<_UsernameDialog> {
     _controller.dispose();
     super.dispose();
   }
+}
+
+String _formatTimestamp(DateTime timestamp) {
+  // Convert to Manila timezone (UTC+8)
+  final manilaTime = timestamp.toUtc().add(const Duration(hours: 8));
+  
+  // Format hour in 12-hour format with AM/PM
+  final hour = manilaTime.hour > 12 ? manilaTime.hour - 12 : (manilaTime.hour == 0 ? 12 : manilaTime.hour);
+  final minute = manilaTime.minute.toString().padLeft(2, '0');
+  final period = manilaTime.hour >= 12 ? 'PM' : 'AM';
+  
+  return '$hour:$minute $period';
 } 

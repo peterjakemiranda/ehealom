@@ -21,16 +21,24 @@ class AppointmentScheduleService
 
         // Check if day is available
         if (!$schedule) {
-            return [];
+            return [
+                'slots' => [],
+                'is_excluded' => false,
+                'reason' => 'No schedule available for this day'
+            ];
         }
 
         // Check if date is excluded
-        $isExcluded = CounselorExcludedDate::where('user_id', $counselorId)
+        $excludedDate = CounselorExcludedDate::where('user_id', $counselorId)
             ->whereDate('excluded_date', $date)
-            ->exists();
+            ->first();
 
-        if ($isExcluded) {
-            return [];
+        if ($excludedDate) {
+            return [
+                'slots' => [],
+                'is_excluded' => true,
+                'reason' => $excludedDate->reason ?? 'This date is excluded from appointments'
+            ];
         }
 
         // Get all slots for the day
@@ -52,7 +60,11 @@ class AppointmentScheduleService
             ->toArray();
 
         // Remove booked slots
-        return array_values(array_diff($slots, $bookedSlots));
+        return [
+            'slots' => array_values(array_diff($slots, $bookedSlots)),
+            'is_excluded' => false,
+            'reason' => null
+        ];
     }
 
     private function generateTimeSlots($startTime, $endTime, $breakStart, $breakEnd, $duration = 60)

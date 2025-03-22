@@ -4,6 +4,8 @@ import '../../services/resource_service.dart';
 import '../../widgets/app_scaffold.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
+import 'package:provider/provider.dart';
+import '../../controllers/auth_controller.dart';
 
 class ResourceDetailsView extends StatefulWidget {
   static const routeName = '/resources/details';
@@ -81,11 +83,19 @@ class _ResourceDetailsViewState extends State<ResourceDetailsView> {
 
   @override
   Widget build(BuildContext context) {
+    // Get the auth controller to check user role
+    final authController = Provider.of<AuthController>(context, listen: false);
+    final roles = authController.user?['user']?['roles'] as List<dynamic>?;
+    final isAdmin = roles?.any((role) => role['name'] == 'counselor') ?? false;
+    
+    // Resources is index 1 for admin, index 2 for regular users
+    final resourcesIndex = isAdmin ? 1 : 2;
+    
     return AppScaffold(
       title: const Text('Resource Details'),
-      currentIndex: 2,
+      currentIndex: resourcesIndex,
       onNavigationItemSelected: (index) {
-        if (index == 2) {
+        if (index == resourcesIndex) {
           Navigator.of(context).pushReplacementNamed('/resources');
         } else {
           switch (index) {
@@ -93,7 +103,14 @@ class _ResourceDetailsViewState extends State<ResourceDetailsView> {
               Navigator.pushReplacementNamed(context, '/');
               break;
             case 1:
-              Navigator.pushReplacementNamed(context, '/appointments');
+              if (!isAdmin) {
+                Navigator.pushReplacementNamed(context, '/appointments');
+              }
+              break;
+            case 2:
+              if (!isAdmin) {
+                Navigator.pushReplacementNamed(context, '/chat');
+              }
               break;
           }
         }

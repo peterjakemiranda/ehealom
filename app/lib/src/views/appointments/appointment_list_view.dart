@@ -495,7 +495,7 @@ class _AppointmentCard extends StatelessWidget {
       case 'cancelled':
         return Colors.red;
       case 'completed':
-        return const Color(0xFF1C0FD6);  // Primary blue instead of blue
+        return Colors.green;
       default:
         return Colors.grey;
     }

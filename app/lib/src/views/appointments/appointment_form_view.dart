@@ -41,6 +41,7 @@ class _AppointmentFormViewState extends State<AppointmentFormView> {
   List<Map<String, dynamic>> _categories = [];
   String? _selectedCategoryId;
   final _categoryService = CategoryService();
+  String? _excludedDateReason;
 
   @override
   void initState() {
@@ -83,14 +84,15 @@ class _AppointmentFormViewState extends State<AppointmentFormView> {
     debugPrint('🔄 Loading time slots for counselor: $_selectedCounselorId, date: $_selectedDate');
     setState(() => _isLoading = true);
     try {
-      final slots = await _appointmentService.fetchAvailableSlots(
+      final result = await _appointmentService.fetchAvailableSlots(
         counselorId: _selectedCounselorId!,
         date: _selectedDate!.toIso8601String().split('T')[0],
       );
       
-      debugPrint('✅ Loaded ${slots.length} time slots');
+      debugPrint('✅ Loaded time slots response: $result');
       setState(() {
-        _timeSlots = slots;
+        _timeSlots = List<String>.from(result['slots'] as List);
+        _excludedDateReason = (result['is_excluded'] as bool?) == true ? result['reason'] as String? : null;
       });
     } catch (e) {
       debugPrint('❌ Error loading time slots: $e');
@@ -351,8 +353,26 @@ class _AppointmentFormViewState extends State<AppointmentFormView> {
     }
 
     if (_timeSlots.isEmpty) {
-      return const Center(
-        child: Text('No available time slots for selected date'),
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (_excludedDateReason != null)
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(
+                  _excludedDateReason!,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.error,
+                    fontSize: 16,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              )
+            else
+              const Text('No available time slots for selected date'),
+          ],
+        ),
       );
     }
 
@@ -379,10 +399,10 @@ class _AppointmentFormViewState extends State<AppointmentFormView> {
             final displayTime = '$displayHour:$minute $period';
 
             return FilterChip(
-              label: Text(displayTime), // Show 12hr format
+              label: Text(displayTime),
               selected: isSelected,
               onSelected: (selected) {
-                setState(() => _selectedTime = selected ? time : null); // Keep 24hr format internally
+                setState(() => _selectedTime = selected ? time : null);
               },
               backgroundColor: isSelected ? Theme.of(context).primaryColor : null,
               labelStyle: TextStyle(

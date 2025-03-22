@@ -129,7 +129,7 @@ class AppointmentService {
     }
   }
 
-  Future<List<String>> fetchAvailableSlots({
+  Future<Map<String, dynamic>> fetchAvailableSlots({
     required String counselorId,
     required String date,
   }) async {
@@ -156,7 +156,13 @@ class AppointmentService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return List<String>.from(data['slots'] ?? []);
+        return {
+          'slots': List<String>.from(data['slots'] ?? []),
+          'is_excluded': data['is_excluded'] ?? false,
+          'reason': data['is_excluded'] == true 
+              ? 'The counselor is not available on this date. Reason: ${data['reason'] ?? 'No reason provided'}'
+              : null,
+        };
       } else {
         throw Exception('Failed to load time slots: ${response.statusCode}');
       }
