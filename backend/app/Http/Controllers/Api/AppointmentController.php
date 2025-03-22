@@ -24,8 +24,6 @@ class AppointmentController extends Controller
 
     // Time slot interval in minutes (can be moved to settings later)
     const TIME_SLOT_INTERVAL = 30;
-    const START_TIME = '09:00';
-    const END_TIME = '17:00';
 
     public function index(Request $request)
     {
@@ -33,7 +31,7 @@ class AppointmentController extends Controller
             ->with(['student', 'counselor']);
 
         // Filter by user role first
-        if ($request->user()->hasRole('student')) {
+        if ($request->user()->hasRole('student') || $request->user()->hasRole('personnel')) {
             $query->where('student_id', $request->user()->id);
         } elseif ($request->user()->hasRole('counselor')) {
             $query->where('counselor_id', $request->user()->id);
@@ -58,28 +56,33 @@ class AppointmentController extends Controller
         $now = now();
         switch ($request->get('status')) {
             case 'upcoming':
-                $query->where('status', 'confirmed')
-                    ->whereDate('appointment_date', '>=', $now);
+                $query->where(function($q) use ($now) {
+                    $q->where('status', 'confirmed')
+                        ->whereDate('appointment_date', '>=', $now);
+                });
                 break;
-            case 'pending':
-                $query->where('status', 'pending');
-                break;
-            case 'past':
+            case 'history':
                 $query->where(function($q) use ($now) {
                     $q->where('status', 'completed')
+                        ->orWhere('status', 'cancelled')
                         ->orWhere(function($q) use ($now) {
                             $q->whereDate('appointment_date', '<', $now)
                                 ->where('status', 'confirmed');
                         });
                 });
                 break;
-            case 'cancelled':
-                $query->where('status', 'cancelled');
-                break;
         }
 
-        $appointments = $query->orderBy('appointment_date', 'desc')
-            ->paginate($request->input('per_page', 10));
+        // Custom sorting for appointments
+        $query->orderByRaw('
+            CASE 
+                WHEN appointment_date >= ? THEN 0 
+                ELSE 1 
+            END,
+            appointment_date ASC
+        ', [$now]);
+
+        $appointments = $query->paginate($request->input('per_page', 10));
 
         return AppointmentResource::collection($appointments);
     }
@@ -128,6 +131,7 @@ class AppointmentController extends Controller
             'student_id' => 'required_without_all:student_name,student_id_number,student_email|exists:users,id',
         ]);
 
+        // Get or create student
         if (!$request->has('student_id')) {
             // Create minimal user record for the student
             $student = User::create([
@@ -143,9 +147,28 @@ class AppointmentController extends Controller
             $student_id = $validated['student_id'];
         }
 
+        // Determine counselor_id based on user role
+        $counselor_id = null;
+        if ($request->user()->hasRole('counselor')) {
+            $counselor_id = $request->user()->id;
+        } else {
+            // Find the first available counselor
+            $counselor = User::role('counselor')
+                ->where('status', true)
+                ->first();
+
+            if (!$counselor) {
+                return response()->json([
+                    'message' => 'No counselors available at the moment'
+                ], 422);
+            }
+
+            $counselor_id = $counselor->id;
+        }
+
         $appointment = Appointment::create([
             'student_id' => $student_id,
-            'counselor_id' => auth()->id(),
+            'counselor_id' => $counselor_id,
             'appointment_date' => $validated['appointment_date'],
             'reason' => $validated['reason'],
             'location_type' => $validated['location_type'],
@@ -208,7 +231,7 @@ class AppointmentController extends Controller
         $user = $request->user();
 
         // Filter by user role
-        if ($user->hasRole('student')) {
+        if ($user->hasRole('student') || $user->hasRole('personnel')) {
             $query->where('student_id', $user->id);
         } elseif ($user->hasRole('counselor')) {
             $query->where('counselor_id', $user->id);
@@ -221,20 +244,15 @@ class AppointmentController extends Controller
                 ->where('status', 'confirmed')
                 ->whereDate('appointment_date', '>=', $now)
                 ->count(),
-            'pending' => (clone $query)
-                ->where('status', 'pending')
-                ->count(),
-            'past' => (clone $query)
+            'history' => (clone $query)
                 ->where(function($q) use ($now) {
                     $q->where('status', 'completed')
+                        ->orWhere('status', 'cancelled')
                         ->orWhere(function($q) use ($now) {
                             $q->whereDate('appointment_date', '<', $now)
                                 ->where('status', 'confirmed');
                         });
                 })
-                ->count(),
-            'cancelled' => (clone $query)
-                ->where('status', 'cancelled')
                 ->count(),
         ];
 
@@ -256,25 +274,14 @@ class AppointmentController extends Controller
             ], 422);
         }
 
-        $date = Carbon::parse($request->date);
-        
-        // Get all slots
-        $slots = ['09:00', '10:00', '11:00', '13:00', '14:00', '15:00', '16:00'];
-        
-        // Get booked slots
-        $bookedSlots = Appointment::where('counselor_id', $request->counselor_id)
-            ->whereDate('appointment_date', $date)
-            ->pluck('appointment_date')
-            ->map(function($datetime) {
-                return Carbon::parse($datetime)->format('H:i');
-            })
-            ->toArray();
-        
-        // Remove booked slots
-        $availableSlots = array_values(array_diff($slots, $bookedSlots));
+        // Use the schedule service to get available slots
+        $slots = $this->scheduleService->getAvailableSlots(
+            $request->counselor_id,
+            $request->date
+        );
 
         return response()->json([
-            'slots' => $availableSlots
+            'slots' => $slots
         ]);
     }
 

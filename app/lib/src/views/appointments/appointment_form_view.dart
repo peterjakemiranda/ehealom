@@ -225,10 +225,24 @@ class _AppointmentFormViewState extends State<AppointmentFormView> {
           optionsBuilder: (TextEditingValue textEditingValue) async {
             if (textEditingValue.text.length < 2) return const [];
             
-            final results = await _appointmentService.searchStudents(
-              textEditingValue.text,
-            );
-            return results;
+            try {
+              final results = await _appointmentService.searchStudents(
+                textEditingValue.text,
+                role: 'student',  // Add role parameter
+              );
+              return results;
+            } catch (e) {
+              debugPrint('Error searching students: $e');
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Failed to search students: $e'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+              return const [];
+            }
           },
           onSelected: (Map<String, dynamic> selection) {
             setState(() {

@@ -238,8 +238,76 @@ class _HomeViewState extends State<HomeView> {
   }
 
   Widget _buildUpcomingAppointment() {
-    final nextAppointment = _upcomingAppointments.first;
-    final isPending = nextAppointment.status.toLowerCase() == 'pending';
+    // Filter for confirmed appointments only
+    final confirmedAppointments = _upcomingAppointments
+        .where((apt) => apt.status.toLowerCase() == 'confirmed')
+        .toList();
+
+    if (confirmedAppointments.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Upcoming appointment',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pushNamed(context, '/appointments'),
+                  child: const Text('See all'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Card(
+              elevation: 0,
+              color: Theme.of(context).primaryColor.withOpacity(0.85),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'No upcoming appointments',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Book an appointment with your counselor',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.white.withOpacity(0.9),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: _createAppointment,
+                      style: ElevatedButton.styleFrom(
+                        primary: Colors.white,
+                        onPrimary: Theme.of(context).primaryColor,
+                      ),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Book Appointment'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final nextAppointment = confirmedAppointments.first;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
@@ -340,42 +408,6 @@ class _HomeViewState extends State<HomeView> {
                       ),
                     ],
                   ),
-                  if (isPending) ...[
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFA726).withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: const Color(0xFFFFA726),
-                          width: 1,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.pending_outlined,
-                            size: 16,
-                            color: const Color(0xFFFFA726),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Pending Confirmation',
-                            style: TextStyle(
-                              color: const Color(0xFFFFA726),
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),
@@ -390,7 +422,8 @@ class _HomeViewState extends State<HomeView> {
       'January', 'February', 'March', 'April', 'May', 'June',
       'July', 'August', 'September', 'October', 'November', 'December'
     ];
-    return '${months[date.month - 1]} ${date.day}';
+    final time = '${date.hour}:${date.minute.toString().padLeft(2, '0')}';
+    return '${months[date.month - 1]} ${date.day} at $time';
   }
 
   Widget _buildWellnessResources() {

@@ -12,6 +12,7 @@ class Appointment {
   final Map<String, dynamic>? student;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  final String? userType;
 
   Appointment({
     required this.id,
@@ -27,6 +28,7 @@ class Appointment {
     this.student,
     this.createdAt,
     this.updatedAt,
+    this.userType,
   });
 
   factory Appointment.fromJson(Map<String, dynamic> json) {
@@ -50,6 +52,7 @@ class Appointment {
       updatedAt: json['updated_at'] != null 
           ? DateTime.parse(json['updated_at']) 
           : null,
+      userType: json['user_type']?.toString(),
     );
   }
 } 

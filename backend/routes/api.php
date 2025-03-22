@@ -44,6 +44,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::apiResource('categories', CategoryController::class);
     
     Route::apiResource('roles', RoleController::class);
+    Route::get('users/search', [UserController::class, 'searchStudents']);
+
     Route::apiResource('users', UserController::class);
 
     Route::patch('users/{user}/toggle-status', [UserController::class, 'toggleStatus']);

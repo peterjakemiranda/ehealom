@@ -29,6 +29,17 @@
             <div class="flex items-center gap-2">
               <MapPinIcon class="h-4 w-4" />
               {{ appointment.location_type === 'online' ? 'Online' : appointment.location }}
+              <span 
+                v-if="appointment.user_type"
+                class="px-2 py-0.5 rounded-full text-xs font-bold"
+                :class="[
+                  appointment.user_type === 'student' 
+                    ? 'bg-blue-100 text-blue-800'
+                    : 'bg-orange-100 text-orange-800'
+                ]"
+              >
+                {{ appointment.user_type.toUpperCase() }}
+              </span>
             </div>
             <div class="flex items-center gap-2">
               <div class="avatar placeholder">
@@ -41,14 +52,14 @@
               {{ isStudent ? appointment.counselor?.name : appointment.student?.name }}
             </div>
             <span 
-          :class="[
-            'badge text-white',
-            statusClass,
-            'capitalize'
-          ]"
-        >
-          {{ appointment.status }}
-        </span>
+              :class="[
+                'badge text-white',
+                statusClass,
+                'capitalize'
+              ]"
+            >
+              {{ appointment.status }}
+            </span>
           </div>
         </div>
       </div>
@@ -88,8 +99,7 @@ import { formatInTimeZone } from 'date-fns-tz'
 import { parseISO } from 'date-fns'
 import { 
   MapPinIcon, 
-  ClockIcon, 
-  UserIcon,
+  ClockIcon,
   EllipsisVerticalIcon,
   PencilIcon
 } from '@heroicons/vue/24/outline'
@@ -115,7 +125,7 @@ const canManageAppointments = computed(() => {
 const statusClass = computed(() => {
   const classes = {
     pending: 'badge-warning',
-    confirmed: 'badge-success',
+    confirmed: 'badge-primary',
     completed: 'badge-info',
     cancelled: 'badge-error'
   }

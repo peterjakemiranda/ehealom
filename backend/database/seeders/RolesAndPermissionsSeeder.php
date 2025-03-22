@@ -32,19 +32,12 @@ class RolesAndPermissionsSeeder extends Seeder
     ];
 
     protected $rolePermissions = [
-        'admin' => [
-            '*' // Wildcard for all permissions
+        'counselor' => [
+            '*'
         ],
         'student' => [
             'view appointments',
             'view resources',
-        ],
-        'counselor' => [
-            'view appointments',
-            'manage appointments',
-            'cancel appointments',
-            'view resources',
-            'manage resources',
         ],
         'personnel' => [
             'view appointments',

@@ -179,7 +179,7 @@ class AuthController with ChangeNotifier {
       };
 
       final response = await _authService.updateProfile(data);
-      _user = response['user'];
+      _user = response;
       notifyListeners();
     } catch (e) {
       rethrow;

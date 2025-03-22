@@ -5,8 +5,8 @@ export default {
     extend: {
       colors: {
         primary: {
-          DEFAULT: '#78B5B0',
-          focus: '#5A9994', // Slightly darker shade for hover/focus
+          DEFAULT: '#1C0FD6',
+          focus: '#1609A3', // Slightly darker shade for hover/focus
           content: '#ffffff' // Text color on primary background
         }
       }
@@ -18,18 +18,18 @@ export default {
       {
         light: {
           ...require('daisyui/src/theming/themes')['light'],
-          primary: '#78B5B0',
-          'primary-focus': '#5A9994',
+          primary: '#1C0FD6',
+          'primary-focus': '#1609A3',
           'primary-content': '#ffffff',
           '--btn-text-case': 'none',
           // Button specific colors
           '.btn-outline': {
             '--tw-border-opacity': '1',
-            'border-color': '#78B5B0',
-            color: '#78B5B0',
+            'border-color': '#1C0FD6',
+            color: '#1C0FD6',
             '&:hover': {
-              'background-color': '#78B5B0',
-              'border-color': '#78B5B0',
+              'background-color': '#1C0FD6',
+              'border-color': '#1C0FD6',
               color: '#ffffff'
             }
           }

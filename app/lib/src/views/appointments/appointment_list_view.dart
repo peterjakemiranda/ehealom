@@ -27,18 +27,14 @@ class _AppointmentListViewState extends State<AppointmentListView> {
   List<String> _departments = [];
   Map<String, int> _counts = {
     'upcoming': 0,
-    'pending': 0,
-    'past': 0,
-    'cancelled': 0,
+    'history': 0,
   };
   Map<String, dynamic> _meta = {};
 
   // Update filter colors
   final Map<String, Color> _filterColors = {
-    'upcoming': const Color(0xFF1C0FD6),  // Primary blue instead of green
-    'pending': const Color(0xFFFFA726),   // Orange
-    'past': const Color(0xFF1C0FD6),      // Primary blue instead of blue
-    'cancelled': const Color(0xFFEF5350),  // Red
+    'upcoming': const Color(0xFF1C0FD6),  // Primary blue
+    'history': const Color(0xFF9E9E9E),   // Grey
   };
 
   @override
@@ -73,9 +69,7 @@ class _AppointmentListViewState extends State<AppointmentListView> {
             child: Row(
               children: [
                 _buildFilterChip('Upcoming'),
-                _buildFilterChip('Pending'),
-                _buildFilterChip('Past'),
-                _buildFilterChip('Cancelled'),
+                _buildFilterChip('History'),
               ],
             ),
           ),
@@ -111,7 +105,10 @@ class _AppointmentListViewState extends State<AppointmentListView> {
     try {
       final counts = await _appointmentService.getAppointmentCounts();
       setState(() {
-        _counts = counts;
+        _counts = {
+          'upcoming': counts['upcoming'] ?? 0,
+          'history': (counts['past'] ?? 0) + (counts['cancelled'] ?? 0),
+        };
       });
     } catch (e) {
       debugPrint('❌ Error loading appointment counts: $e');
@@ -316,7 +313,8 @@ class _AppointmentCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final authController = Provider.of<AuthController>(context);
-    final isCounselor = authController.user?['roles'].contains('counselor');
+    final roles = authController.user?['user']?['roles'] as List<dynamic>?;
+    final isCounselor = roles?.any((role) => role['name'] == 'counselor') ?? false;
     final canUpdateStatus = isCounselor && 
         ['pending', 'confirmed'].contains(appointment.status.toLowerCase());
 
@@ -333,9 +331,23 @@ class _AppointmentCard extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Expanded(
-                    child: Text(
-                      appointment.reason,
-                      style: Theme.of(context).textTheme.titleMedium,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          appointment.reason,
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        if (appointment.student != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            appointment.student?['name'],
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                   Row(
@@ -371,6 +383,28 @@ class _AppointmentCard extends StatelessWidget {
                         ? 'Online'
                         : appointment.location ?? 'On-site',
                   ),
+                  if (appointment.userType != null) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: appointment.userType == 'student' 
+                            ? Colors.blue.withOpacity(0.1)
+                            : Colors.orange.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        appointment.userType!.toUpperCase(),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: appointment.userType == 'student' 
+                              ? Colors.blue
+                              : Colors.orange,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ],

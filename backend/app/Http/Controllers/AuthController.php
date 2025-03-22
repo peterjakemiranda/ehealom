@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Spatie\Permission\Models\Role;
+use App\Http\Resources\UserResource;
 
 class AuthController extends Controller
 {
@@ -96,6 +97,8 @@ class AuthController extends Controller
 
         return response()->json([
             'user' => $user,
+            'permissions' => $user->getAllPermissions()->pluck('name'),
+            'roles' => $user->getRoleNames(),
             'token' => $token,
         ]);
     }
@@ -140,8 +143,9 @@ class AuthController extends Controller
         $user->save();
 
         return response()->json([
-            'message' => 'Profile updated successfully',
-            'name' => $user->name
+            'user' => $user,
+            'permissions' => $user->getAllPermissions()->pluck('name'),
+            'roles' => $user->getRoleNames(),
         ]);
     }
 }

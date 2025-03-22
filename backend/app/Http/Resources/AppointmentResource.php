@@ -22,6 +22,7 @@ class AppointmentResource extends JsonResource
             'counselor' => new UserResource($this->whenLoaded('counselor')),
             'location_type' => $this->location_type,
             'location' => $this->location ?: ucfirst($this->location_type),
+            'user_type' => $this->student?->roles?->contains('name', 'student') ? 'student' : 'personnel',
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at
         ];

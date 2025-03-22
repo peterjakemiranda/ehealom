@@ -148,6 +148,12 @@ class _ProfileViewState extends State<ProfileView> {
     final user = context.watch<AuthController>().user;
     debugPrint('ProfileView build - User data: $user');
 
+    // Get user type from roles
+    final userRoles = user?['roles'] as List<dynamic>? ?? [];
+    final isAdmin = userRoles.contains('counselor');
+    final isStudent = userRoles.contains('student');
+    final isPersonnel = userRoles.contains('personnel');
+
     // Update fields when user data changes
     if (user != null && user['user'] != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -173,6 +179,7 @@ class _ProfileViewState extends State<ProfileView> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Common fields for all users
               TextFormField(
                 controller: _nameController,
                 decoration: const InputDecoration(
@@ -204,106 +211,6 @@ class _ProfileViewState extends State<ProfileView> {
               ),
               const SizedBox(height: 16),
               TextFormField(
-                controller: _ageController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Age',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.calendar_today),
-                ),
-                validator: (value) {
-                  if (value?.isEmpty ?? true) return 'Please enter your age';
-                  if (int.tryParse(value!) == null) return 'Please enter a valid age';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                decoration: const InputDecoration(
-                  labelText: 'Sex',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.person_outline),
-                ),
-                value: _selectedSex,
-                items: const [
-                  DropdownMenuItem(value: 'male', child: Text('Male')),
-                  DropdownMenuItem(value: 'female', child: Text('Female')),
-                  DropdownMenuItem(value: 'other', child: Text('Other')),
-                ],
-                onChanged: (value) => setState(() => _selectedSex = value!),
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                decoration: const InputDecoration(
-                  labelText: 'Marital Status',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.family_restroom),
-                ),
-                value: _selectedMaritalStatus,
-                items: const [
-                  DropdownMenuItem(value: 'single', child: Text('Single')),
-                  DropdownMenuItem(value: 'married', child: Text('Married')),
-                  DropdownMenuItem(value: 'divorced', child: Text('Divorced')),
-                  DropdownMenuItem(value: 'widowed', child: Text('Widowed')),
-                ],
-                onChanged: (value) => setState(() => _selectedMaritalStatus = value!),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _studentIdController,
-                decoration: const InputDecoration(
-                  labelText: 'Student ID',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.badge),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _yearLevelController,
-                decoration: const InputDecoration(
-                  labelText: 'Year Level',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.school),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _departmentController,
-                decoration: const InputDecoration(
-                  labelText: 'Department',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.business),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _courseController,
-                decoration: const InputDecoration(
-                  labelText: 'Course',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.school_outlined),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _majorController,
-                decoration: const InputDecoration(
-                  labelText: 'Major',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.subject),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _academicRankController,
-                decoration: const InputDecoration(
-                  labelText: 'Academic Rank',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.work),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
                 controller: _emailController,
                 decoration: const InputDecoration(
                   labelText: 'Email',
@@ -320,6 +227,127 @@ class _ProfileViewState extends State<ProfileView> {
                   return null;
                 },
               ),
+              const SizedBox(height: 24),
+
+              // Only show additional fields for non-admin users
+              if (!isAdmin) ...[
+                TextFormField(
+                  controller: _ageController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Age',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.calendar_today),
+                  ),
+                  validator: (value) {
+                    if (value?.isEmpty ?? true) return 'Please enter your age';
+                    if (int.tryParse(value!) == null) return 'Please enter a valid age';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  decoration: const InputDecoration(
+                    labelText: 'Sex',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.person_outline),
+                  ),
+                  value: _selectedSex,
+                  items: const [
+                    DropdownMenuItem(value: 'male', child: Text('Male')),
+                    DropdownMenuItem(value: 'female', child: Text('Female')),
+                    DropdownMenuItem(value: 'other', child: Text('Other')),
+                  ],
+                  onChanged: (value) => setState(() => _selectedSex = value!),
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  decoration: const InputDecoration(
+                    labelText: 'Marital Status',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.family_restroom),
+                  ),
+                  value: _selectedMaritalStatus,
+                  items: const [
+                    DropdownMenuItem(value: 'single', child: Text('Single')),
+                    DropdownMenuItem(value: 'married', child: Text('Married')),
+                    DropdownMenuItem(value: 'divorced', child: Text('Divorced')),
+                    DropdownMenuItem(value: 'widowed', child: Text('Widowed')),
+                  ],
+                  onChanged: (value) => setState(() => _selectedMaritalStatus = value!),
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // Student-specific fields
+              if (isStudent) ...[
+                TextFormField(
+                  controller: _studentIdController,
+                  decoration: const InputDecoration(
+                    labelText: 'Student ID',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.badge),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _yearLevelController,
+                  decoration: const InputDecoration(
+                    labelText: 'Year Level',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.school),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _departmentController,
+                  decoration: const InputDecoration(
+                    labelText: 'Department',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.business),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _courseController,
+                  decoration: const InputDecoration(
+                    labelText: 'Course',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.school_outlined),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _majorController,
+                  decoration: const InputDecoration(
+                    labelText: 'Major',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.subject),
+                  ),
+                ),
+              ],
+
+              // Personnel-specific fields
+              if (isPersonnel) ...[
+                TextFormField(
+                  controller: _academicRankController,
+                  decoration: const InputDecoration(
+                    labelText: 'Academic Rank',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.work),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _departmentController,
+                  decoration: const InputDecoration(
+                    labelText: 'Department',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.business),
+                  ),
+                ),
+              ],
+
               const SizedBox(height: 24),
               CheckboxListTile(
                 title: const Text('Change Password'),

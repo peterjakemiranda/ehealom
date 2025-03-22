@@ -2,14 +2,54 @@
   <div class="container mx-auto p-4">
     <!-- Header with Add Button -->
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
-      <h2 class="text-xl font-bold">Appointments</h2>
-      <!-- <button 
+      <h2 class="text-xl font-bold text-primary">Appointments</h2>
+      <button 
         v-if="!isStudent" 
         @click="createAppointment" 
         class="btn btn-primary mt-2 sm:mt-0"
       >
         Book Appointment
-      </button> -->
+      </button>
+    </div>
+
+    <!-- Counselor Filters -->
+    <div v-if="isCounselor" class="mb-6 space-y-4">
+      <!-- User Type Filter -->
+      <div class="form-control">
+        <label class="label">
+          <span class="label-text text-gray-700">Filter by User Type</span>
+        </label>
+        <select 
+          v-model="selectedUserType" 
+          class="select select-bordered bg-gray-50"
+          @change="handleFiltersChange"
+        >
+          <option value="all">All Users</option>
+          <option value="student">Students</option>
+          <option value="personnel">Personnel</option>
+        </select>
+      </div>
+
+      <!-- Department Filter (for students) -->
+      <div v-if="selectedUserType === 'student'" class="form-control">
+        <label class="label">
+          <span class="label-text text-gray-700">Filter by Department</span>
+        </label>
+        <select 
+          v-model="selectedDepartment" 
+          class="select select-bordered bg-gray-50"
+          @change="handleFiltersChange"
+        >
+          <option value="">All Departments</option>
+          <option 
+            v-for="dept in departments" 
+            :key="dept" 
+            :value="dept"
+          >
+            {{ dept }}
+          </option>
+        </select>
+      </div>
     </div>
 
     <!-- Status Filters with Counts -->
@@ -29,7 +69,8 @@
           {{ filter.label }} ({{ counts[filter.value] || 0 }})
         </button>
       </div>
-      </div>
+    </div>
+
     <!-- Appointments List -->
     <div v-if="!appointmentStore.isLoading" class="space-y-6">
       <div v-for="(group, month) in groupedAppointments" :key="month">
@@ -96,10 +137,9 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { format, parseISO, startOfMonth } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 import { useAppointmentStore } from '@/stores/appointmentStore'
 import { useAuthStore } from '@/stores/auth'
-import { PlusIcon } from '@heroicons/vue/24/outline'
 import AppointmentCard from '@/components/AppointmentCard.vue'
 import AppointmentForm from '@/components/AppointmentForm.vue'
 import Drawer from '@/components/common/BaseDrawer.vue'
@@ -113,18 +153,19 @@ const selectedAppointment = ref({})
 const statusFilter = ref('upcoming')
 const counts = ref({
   upcoming: 0,
-  pending: 0,
-  past: 0,
-  cancelled: 0
+  history: 0
 })
 
+const selectedUserType = ref('all')
+const selectedDepartment = ref('')
+const departments = ref([])
+
 const isStudent = computed(() => authStore.user?.user_type === 'student')
+const isCounselor = computed(() => authStore.user?.user_type === 'counselor')
 
 const statusFilters = [
   { value: 'upcoming', label: 'Upcoming' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'past', label: 'Past' },
-  { value: 'cancelled', label: 'Cancelled' }
+  { value: 'history', label: 'History' }
 ]
 
 const drawerTitle = computed(() => {
@@ -132,8 +173,7 @@ const drawerTitle = computed(() => {
 })
 
 const filteredAppointments = computed(() => {
-  let appointments = appointmentStore.appointments
-  return appointments
+  return appointmentStore.appointments
 })
 
 const groupedAppointments = computed(() => {
@@ -156,13 +196,33 @@ watch(statusFilter, () => {
   fetchAppointments()
 })
 
+onMounted(async () => {
+  try {
+    const response = await http.get('/api/appointments/departments')
+    departments.value = response.data
+  } catch (error) {
+    console.error('Failed to fetch departments:', error)
+  }
+})
+
 async function fetchAppointments(page = 1) {
   try {
+    const filters = {
+      page,
+      status: statusFilter.value
+    }
+
+    if (isCounselor.value) {
+      if (selectedUserType.value !== 'all') {
+        filters.userType = selectedUserType.value
+      }
+      if (selectedDepartment.value) {
+        filters.department = selectedDepartment.value
+      }
+    }
+
     await Promise.all([
-      appointmentStore.fetchAppointments({
-        page,
-        status: statusFilter.value === 'upcoming' ? 'upcoming' : statusFilter.value
-      }),
+      appointmentStore.fetchAppointments(filters),
       fetchCounts()
     ])
   } catch (error) {
@@ -172,7 +232,7 @@ async function fetchAppointments(page = 1) {
 
 function createAppointment() {
   selectedAppointment.value = {
-    uuid: null,
+    id: null,
     appointment_date: '',
     reason: '',
     counselor_id: '',
@@ -195,7 +255,7 @@ function editAppointment(appointment) {
 
 async function handleStatusUpdate(appointment, newStatus) {
   try {
-    await appointmentStore.updateAppointmentStatus(appointment.uuid, newStatus)
+    await appointmentStore.updateAppointmentStatus(appointment.id, newStatus)
     await fetchCounts()
     swalHelper.toast('success', 'Appointment status updated')
   } catch (error) {
@@ -211,7 +271,7 @@ function closeDrawer() {
 
 async function handleSave(appointmentData) {
   try {
-    if (selectedAppointment.value.id) {
+    if (selectedAppointment.value.uuid) {
       await appointmentStore.updateAppointment(selectedAppointment.value.uuid, appointmentData)
       swalHelper.toast('success', 'Appointment updated successfully')
     } else {
@@ -224,11 +284,6 @@ async function handleSave(appointmentData) {
     console.error('Appointment save error:', error)
     swalHelper.toast('error', `Failed to ${selectedAppointment.value.id ? 'update' : 'book'} appointment`)
   }
-}
-
-function changePage(page) {
-  fetchAppointments(page)
-  window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 const canManageAppointments = computed(() => {
@@ -260,6 +315,14 @@ async function fetchCounts() {
     console.error('Failed to fetch counts:', error)
   }
 }
+
+function handleFiltersChange() {
+  fetchAppointments(1)
+}
+
+watch([selectedUserType, selectedDepartment], () => {
+  handleFiltersChange()
+})
 </script>
 
 <style scoped>

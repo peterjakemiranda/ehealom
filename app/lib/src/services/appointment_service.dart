@@ -266,29 +266,32 @@ class AppointmentService {
     }
   }
 
-  Future<List<Map<String, dynamic>>> searchStudents(String query) async {
+  Future<List<Map<String, dynamic>>> searchStudents(String query, {String? role}) async {
     try {
       final token = await _authService.getToken();
       if (token == null) throw Exception('No authentication token found');
 
       final response = await _client.get(
-        Uri.parse('${ApiConfig.baseUrl}/users/search-students').replace(
-          queryParameters: {'query': query},
+        Uri.parse('${ApiConfig.baseUrl}/users/search').replace(
+          queryParameters: {
+            'query': query,
+            if (role != null) 'role': role,
+          },
         ),
         headers: {
           'Authorization': 'Bearer $token',
           'Accept': 'application/json',
         },
       );
-
+      
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return List<Map<String, dynamic>>.from(data);
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.map((item) => item as Map<String, dynamic>).toList();
       } else {
         throw Exception('Failed to search students: ${response.statusCode}');
       }
     } catch (e) {
-      debugPrint('❌ Error searching students: $e');
+      debugPrint('Error in searchStudents: $e');
       rethrow;
     }
   }

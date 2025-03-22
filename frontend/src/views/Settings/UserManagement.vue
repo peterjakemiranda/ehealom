@@ -53,10 +53,19 @@
                     </span>
                   </div>
                 </div>
-                <div class="flex flex-col items-end">
-                  <span :class="['badge mt-2', user.status ? 'badge-success' : 'badge-error']">
+                <div class="flex flex-col items-end gap-2">
+                  <span :class="['badge', user.status ? 'badge-success' : 'badge-error']">
                     {{ user.status ? 'Active' : 'Inactive' }}
                   </span>
+                  <div class="flex gap-2">
+                    <button 
+                      v-if="canManageUsers"
+                      @click.stop="confirmDelete(user)"
+                      class="btn btn-ghost btn-sm text-error hover:bg-error hover:text-white"
+                    >
+                      <TrashIcon class="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -68,7 +77,7 @@
       <div v-else class="text-center py-12">
         <UserGroupIcon class="h-16 w-16 mx-auto text-gray-400 mb-4" />
         <h2 class="text-2xl font-semibold text-gray-700 mb-2">
-          {{ searchQuery ? 'No users found' : 'No users yet' }}
+          {{ searchQuery ? 'No users found' : 'No users yet'  }}
         </h2>
         <p class="text-gray-500 mb-4">
           {{ 
@@ -111,7 +120,8 @@
 import { ref, onMounted, computed, watch } from 'vue'
 import { useUserStore } from '@/stores/userStore'
 import { useRoleStore } from '@/stores/roleStore'
-import { UserPlusIcon, PencilIcon, UserGroupIcon, XMarkIcon } from '@heroicons/vue/24/outline'
+import { useAuthStore } from '@/stores/auth'
+import { UserPlusIcon, UserGroupIcon, XMarkIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import BaseDrawer from '@/components/common/BaseDrawer.vue'
 import UserForm from '@/components/UserForm.vue'
 import PaginationBar from '@/components/PaginationBar.vue'
@@ -119,10 +129,16 @@ import { swalHelper } from '@/utils/swalHelper'
 
 const userStore = useUserStore()
 const roleStore = useRoleStore()
+const authStore = useAuthStore()
 const searchQuery = ref('')
 const showDrawer = ref(false)
 const selectedUser = ref(null)
 const isEditing = computed(() => !!selectedUser.value?.id)
+
+// Add computed property for user permissions
+const canManageUsers = computed(() => {
+  return authStore.user?.permissions?.includes('manage users') || false
+})
 
 onMounted(async () => {
   await Promise.all([
@@ -193,5 +209,25 @@ function getInitials(name) {
     .join('')
     .toUpperCase()
     .substring(0, 2)
+}
+
+async function confirmDelete(user) {
+  try {
+    const result = await swalHelper.confirm({
+      title: 'Delete User',
+      text: `Are you sure you want to delete ${user.name}?`,
+      icon: 'warning',
+      confirmButtonText: 'Yes, delete it!',
+      confirmButtonColor: '#dc2626'
+    })
+
+    if (result.isConfirmed) {
+      await userStore.deleteUser(user.uuid)
+      swalHelper.toast('success', 'User deleted successfully')
+      await fetchUsers(userStore.pagination.current_page)
+    }
+  } catch (error) {
+    swalHelper.toast('error', 'Failed to delete user')
+  }
 }
 </script>

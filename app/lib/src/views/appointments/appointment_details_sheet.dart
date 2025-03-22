@@ -46,6 +46,10 @@ class AppointmentDetailsSheet extends StatelessWidget {
           if (appointment.notes != null && appointment.notes!.isNotEmpty)
             _buildDetailRow('Notes', appointment.notes!),
           _buildDetailRow(
+            'User', 
+            appointment.student?['name'] ?? 'Not assigned'
+          ),
+          _buildDetailRow(
             'Counselor', 
             appointment.counselor?['name'] ?? 'Not assigned'
           ),
