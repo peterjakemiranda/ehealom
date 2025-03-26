@@ -178,6 +178,8 @@ class AuthController with ChangeNotifier {
         if (maritalStatus != null) 'marital_status': maritalStatus,
       };
 
+      debugPrint('AuthController: Updating profile with data: $data');
+
       final response = await _authService.updateProfile(data);
       _user = response;
       notifyListeners();

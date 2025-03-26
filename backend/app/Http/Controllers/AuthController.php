@@ -38,6 +38,7 @@ class AuthController extends Controller
 
             $user = User::create([
                 'name' => $validated['name'],
+                'username' => $validated['username'],
                 'email' => $validated['email'],
                 'password' => Hash::make($validated['password']),
                 'age' => $validated['age'],
@@ -123,9 +124,25 @@ class AuthController extends Controller
     {
         $user = $request->user();
         
-        $request->validate([
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
+            'username' => 'required|string|max:255|unique:users,username,' . $user->id,
             'current_password' => 'required_with:new_password',
-            'new_password' => 'nullable|min:6'
+            'new_password' => 'nullable|min:8',
+            
+            // Common fields
+            'age' => 'nullable|integer|min:0',
+            'sex' => 'nullable|string|in:male,female,other',
+            'marital_status' => 'nullable|string',
+            'department' => 'nullable|string',
+            
+            // Role-specific fields
+            'student_id' => 'nullable|string',
+            'year_level' => 'nullable|string',
+            'course' => 'nullable|string',
+            'major' => 'nullable|string',
+            'academic_rank' => 'nullable|string',
         ]);
 
         if ($request->has('current_password')) {
@@ -138,8 +155,27 @@ class AuthController extends Controller
             $user->password = Hash::make($request->new_password);
         }
 
-        $user->name = $request->name;
-        $user->username = $request->username ?? null;
+        // Update common fields
+        $user->name = $validated['name'];
+        $user->email = $validated['email'];
+        $user->username = $validated['username'];
+        $user->age = $validated['age'] ?? $user->age;
+        $user->sex = $validated['sex'] ?? $user->sex;
+        $user->marital_status = $validated['marital_status'] ?? $user->marital_status;
+        $user->department = $validated['department'] ?? $user->department;
+
+        // Update role-specific fields
+        if ($user->hasRole('student')) {
+            $user->student_id = $validated['student_id'] ?? $user->student_id;
+            $user->year_level = $validated['year_level'] ?? $user->year_level;
+            $user->course = $validated['course'] ?? $user->course;
+            $user->major = $validated['major'] ?? $user->major;
+        }
+
+        if ($user->hasRole('personnel')) {
+            $user->academic_rank = $validated['academic_rank'] ?? $user->academic_rank;
+        }
+
         $user->save();
 
         return response()->json([

@@ -22,7 +22,7 @@ class _ProfileViewState extends State<ProfileView> {
   final _confirmPasswordController = TextEditingController();
   final _ageController = TextEditingController();
   final _studentIdController = TextEditingController();
-  final _departmentController = TextEditingController();
+  String _selectedDepartment = '';
   final _courseController = TextEditingController();
   final _majorController = TextEditingController();
   final _yearLevelController = TextEditingController();
@@ -31,6 +31,27 @@ class _ProfileViewState extends State<ProfileView> {
   bool _changePassword = false;
   String _selectedSex = 'male';
   String _selectedMaritalStatus = 'single';
+
+  // Base department options
+  final List<Map<String, String>> _baseDepatments = [
+    {'value': 'DCS', 'label': 'DCS – Department of Computer Studies'},
+    {'value': 'DBM', 'label': 'DBM - Department of Business and Management'},
+    {'value': 'DIT', 'label': 'DIT – Department of Industrial Technology'},
+    {'value': 'DGTT', 'label': 'DGTT – Department of General Teacher Training'},
+    {'value': 'CCJE', 'label': 'CCJE – College of Criminal Justice Education'},
+  ];
+
+  // School Admin option for personnel only
+  final Map<String, String> _schoolAdminDept = 
+    {'value': 'SA', 'label': 'School Admin'};
+
+  List<Map<String, String>> _getDepartments(bool isPersonnel) {
+    final depts = List<Map<String, String>>.from(_baseDepatments);
+    if (isPersonnel) {
+      depts.add(_schoolAdminDept);
+    }
+    return depts;
+  }
 
   @override
   void initState() {
@@ -52,7 +73,7 @@ class _ProfileViewState extends State<ProfileView> {
         _usernameController.text = userData['username'] ?? '';
         _ageController.text = userData['age']?.toString() ?? '';
         _studentIdController.text = userData['student_id'] ?? '';
-        _departmentController.text = userData['department'] ?? '';
+        _selectedDepartment = userData['department']?.toString() ?? '';
         _courseController.text = userData['course'] ?? '';
         _majorController.text = userData['major'] ?? '';
         _yearLevelController.text = userData['year_level']?.toString() ?? '';
@@ -60,6 +81,7 @@ class _ProfileViewState extends State<ProfileView> {
         _selectedSex = userData['sex'] ?? 'male';
         _selectedMaritalStatus = userData['marital_status'] ?? 'single';
       });
+      debugPrint('Loaded department: ${_selectedDepartment}');
     }
   }
 
@@ -86,7 +108,6 @@ class _ProfileViewState extends State<ProfileView> {
     _confirmPasswordController.dispose();
     _ageController.dispose();
     _studentIdController.dispose();
-    _departmentController.dispose();
     _courseController.dispose();
     _majorController.dispose();
     _yearLevelController.dispose();
@@ -100,7 +121,50 @@ class _ProfileViewState extends State<ProfileView> {
     setState(() => _isLoading = true);
 
     try {
-      await context.read<AuthController>().updateProfile(
+      // Get user type
+      final user = context.read<AuthController>().user;
+      final userRoles = user?['roles'] as List<dynamic>? ?? [];
+      final isPersonnel = userRoles.contains('personnel');
+
+      // Prepare update data with common fields
+      final updateData = {
+        'name': _nameController.text,
+        'email': _emailController.text,
+        'username': _usernameController.text,
+        'age': int.tryParse(_ageController.text),
+        'department': _selectedDepartment,
+        'sex': _selectedSex,
+        'marital_status': _selectedMaritalStatus,
+      };
+
+      // Add role-specific fields
+      if (isPersonnel) {
+        if (_academicRankController.text.isNotEmpty) {
+          updateData['academic_rank'] = _academicRankController.text;
+        }
+      } else {
+        // Student fields
+        updateData.addAll({
+          'student_id': _studentIdController.text,
+          'course': _courseController.text,
+          'major': _majorController.text,
+          'year_level': _yearLevelController.text,
+        });
+      }
+
+      // Add password fields only if changing password
+      if (_changePassword) {
+        updateData.addAll({
+          'current_password': _currentPasswordController.text,
+          'new_password': _newPasswordController.text,
+          'new_password_confirmation': _confirmPasswordController.text,
+        });
+      }
+
+      debugPrint('Updating profile with data: $updateData');
+      
+      // Perform the update
+      final result = await context.read<AuthController>().updateProfile(
         name: _nameController.text,
         email: _emailController.text,
         username: _usernameController.text,
@@ -108,30 +172,43 @@ class _ProfileViewState extends State<ProfileView> {
         newPassword: _changePassword ? _newPasswordController.text : null,
         newPasswordConfirmation: _changePassword ? _confirmPasswordController.text : null,
         age: int.tryParse(_ageController.text),
-        studentId: _studentIdController.text,
-        department: _departmentController.text,
-        course: _courseController.text,
-        major: _majorController.text,
-        yearLevel: _yearLevelController.text,
-        academicRank: _academicRankController.text,
+        studentId: isPersonnel ? null : _studentIdController.text,
+        department: _selectedDepartment,
+        course: isPersonnel ? null : _courseController.text,
+        major: isPersonnel ? null : _majorController.text,
+        yearLevel: isPersonnel ? null : _yearLevelController.text,
+        academicRank: isPersonnel && _academicRankController.text.isNotEmpty ? _academicRankController.text : null,
         sex: _selectedSex,
         maritalStatus: _selectedMaritalStatus,
       );
       
       if (!mounted) return;
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profile updated successfully')),
-      );
 
+      // Clear password fields if password was changed
       if (_changePassword) {
         _currentPasswordController.clear();
         _newPasswordController.clear();
         _confirmPasswordController.clear();
         setState(() => _changePassword = false);
       }
+      
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile updated successfully')),
+      );
+
+      // Wait a brief moment before reloading data to ensure the API has processed the update
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      // Force refresh by getting user data again
+      await context.read<AuthController>().refreshUserData();
+      
+      // Now reload the local form data
+      _loadUserData();
+
     } catch (e) {
       if (!mounted) return;
+      debugPrint('Error updating profile: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error updating profile: $e')),
       );
@@ -153,6 +230,9 @@ class _ProfileViewState extends State<ProfileView> {
     final isAdmin = userRoles.contains('counselor');
     final isStudent = userRoles.contains('student');
     final isPersonnel = userRoles.contains('personnel');
+
+    // Get departments based on user role
+    final departments = _getDepartments(isPersonnel);
 
     // Update fields when user data changes
     if (user != null && user['user'] != null) {
@@ -299,13 +379,34 @@ class _ProfileViewState extends State<ProfileView> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                TextFormField(
-                  controller: _departmentController,
+                DropdownButtonFormField<String>(
                   decoration: const InputDecoration(
                     labelText: 'Department',
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.business),
                   ),
+                  isExpanded: true,
+                  menuMaxHeight: 300,
+                  value: _selectedDepartment.isEmpty ? null : _selectedDepartment,
+                  items: departments.map((department) {
+                    return DropdownMenuItem(
+                      value: department['value'],
+                      child: Text(
+                        department['label']!,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() => _selectedDepartment = value!);
+                  },
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please select your department';
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
@@ -338,13 +439,34 @@ class _ProfileViewState extends State<ProfileView> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                TextFormField(
-                  controller: _departmentController,
+                DropdownButtonFormField<String>(
                   decoration: const InputDecoration(
                     labelText: 'Department',
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.business),
                   ),
+                  isExpanded: true,
+                  menuMaxHeight: 300,
+                  value: _selectedDepartment.isEmpty ? null : _selectedDepartment,
+                  items: departments.map((department) {
+                    return DropdownMenuItem(
+                      value: department['value'],
+                      child: Text(
+                        department['label']!,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() => _selectedDepartment = value!);
+                  },
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please select your department';
+                    }
+                    return null;
+                  },
                 ),
               ],
 

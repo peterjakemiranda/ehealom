@@ -21,11 +21,12 @@ class _AppointmentListViewState extends State<AppointmentListView> {
   final _appointmentService = AppointmentService();
   List<Appointment> _appointments = [];
   bool _isLoading = false;
-  String _selectedFilter = 'upcoming';
+  String _selectedFilter = 'pending';
   String _selectedUserType = 'all';
-  String? _selectedDepartment;
-  List<String> _departments = [];
+  String _searchQuery = '';
+  final _searchController = TextEditingController();
   Map<String, int> _counts = {
+    'pending': 0,
     'upcoming': 0,
     'history': 0,
   };
@@ -33,6 +34,7 @@ class _AppointmentListViewState extends State<AppointmentListView> {
 
   // Update filter colors
   final Map<String, Color> _filterColors = {
+    'pending': Colors.orange,             // Orange for pending
     'upcoming': const Color(0xFF1C0FD6),  // Primary blue
     'history': const Color(0xFF9E9E9E),   // Grey
   };
@@ -42,7 +44,12 @@ class _AppointmentListViewState extends State<AppointmentListView> {
     super.initState();
     _loadAppointments();
     _loadCounts();
-    _loadDepartments();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   @override
@@ -68,6 +75,7 @@ class _AppointmentListViewState extends State<AppointmentListView> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
             child: Row(
               children: [
+                _buildFilterChip('Pending'),
                 _buildFilterChip('Upcoming'),
                 _buildFilterChip('History'),
               ],
@@ -106,25 +114,13 @@ class _AppointmentListViewState extends State<AppointmentListView> {
       final counts = await _appointmentService.getAppointmentCounts();
       setState(() {
         _counts = {
+          'pending': counts['pending'] ?? 0,
           'upcoming': counts['upcoming'] ?? 0,
           'history': (counts['past'] ?? 0) + (counts['cancelled'] ?? 0),
         };
       });
     } catch (e) {
       debugPrint('❌ Error loading appointment counts: $e');
-    }
-  }
-
-  Future<void> _loadDepartments() async {
-    try {
-      debugPrint('🔄 Loading departments...');
-      final departments = await _appointmentService.getDepartments();
-      debugPrint('✅ Loaded departments: $departments');
-      setState(() {
-        _departments = departments;
-      });
-    } catch (e) {
-      debugPrint('❌ Error loading departments: $e');
     }
   }
 
@@ -150,39 +146,44 @@ class _AppointmentListViewState extends State<AppointmentListView> {
             onChanged: (value) {
               setState(() {
                 _selectedUserType = value!;
-                if (value != 'student') {
-                  _selectedDepartment = null;
-                }
+                _searchQuery = '';
+                _searchController.clear();
               });
               _loadAppointments();
             },
           ),
 
-          // Department Dropdown (only show when Students are selected)
-          if (_selectedUserType == 'student') ...[
-            const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              decoration: const InputDecoration(
-                labelText: 'Filter by Department',
-                border: OutlineInputBorder(),
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              ),
-              value: _selectedDepartment,
-              items: [
-                DropdownMenuItem(value: null, child: Text('All Departments')),
-                ..._departments.map((dept) => DropdownMenuItem(
-                  value: dept,
-                  child: Text(dept),
-                )),
-              ],
-              onChanged: (value) {
-                setState(() {
-                  _selectedDepartment = value;
-                });
-                _loadAppointments();
-              },
+          // Search field
+          const SizedBox(height: 16),
+          TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              labelText: 'Search by Name',
+              hintText: 'Enter student or personnel name',
+              border: OutlineInputBorder(),
+              prefixIcon: Icon(Icons.search),
+              suffixIcon: _searchQuery.isNotEmpty
+                  ? IconButton(
+                      icon: Icon(Icons.clear),
+                      onPressed: () {
+                        setState(() {
+                          _searchController.clear();
+                          _searchQuery = '';
+                        });
+                        _loadAppointments();
+                      },
+                    )
+                  : null,
             ),
-          ],
+            onChanged: (value) {
+              setState(() {
+                _searchQuery = value;
+              });
+            },
+            onSubmitted: (value) {
+              _loadAppointments();
+            },
+          ),
         ],
       ),
     );
@@ -250,7 +251,7 @@ class _AppointmentListViewState extends State<AppointmentListView> {
       final result = await _appointmentService.fetchAppointments(
         status: _selectedFilter,
         userType: _selectedUserType != 'all' ? _selectedUserType : null,
-        department: _selectedDepartment,
+        search: _searchQuery.isNotEmpty ? _searchQuery : null,
       );
 
       debugPrint('Appointments Result: ${jsonEncode(result)}');

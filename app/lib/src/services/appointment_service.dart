@@ -24,7 +24,7 @@ class AppointmentService {
     int perPage = 10,
     bool upcoming = false,
     String? userType,
-    String? department,
+    String? search,
   }) async {
     try {
       final token = await _authService.getToken();
@@ -37,7 +37,7 @@ class AppointmentService {
         if (date != null) 'date': date,
         if (upcoming) 'upcoming': 'true',
         if (userType != null && userType != 'all') 'user_type': userType,
-        if (department != null) 'department': department,
+        if (search != null && search.isNotEmpty) 'search': search,
       };
 
       final url = Uri.parse('${ApiConfig.baseUrl}/appointments').replace(

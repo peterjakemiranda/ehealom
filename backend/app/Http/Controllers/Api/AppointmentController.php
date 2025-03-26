@@ -42,13 +42,14 @@ class AppointmentController extends Controller
                 $query->whereHas('student.roles', function($q) use ($role) {
                     $q->where('name', $role);
                 });
+            }
 
-                // Add department filter for students
-                if ($role === 'student' && $request->has('department')) {
-                    $query->whereHas('student', function($q) use ($request) {
-                        $q->where('department', $request->department);
-                    });
-                }
+            // Add search by name functionality
+            if ($request->has('search') && !empty($request->search)) {
+                $search = $request->search;
+                $query->whereHas('student', function($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%");
+                });
             }
         }
 
@@ -64,13 +65,19 @@ class AppointmentController extends Controller
                     ->whereDate('appointment_date', '>=', $now);
                 });
                 break;
+            case 'pending':
+                $query->where('status', 'pending');
+                break;
             case 'history':
                 $query->where(function($q) use ($now) {
                     $q->where('status', 'completed')
                         ->orWhere('status', 'cancelled')
                         ->orWhere(function($q) use ($now) {
                             $q->whereDate('appointment_date', '<', $now)
-                                ->where('status', 'confirmed');
+                                ->where(function($q) {
+                                    $q->where('status', 'confirmed')
+                                        ->orWhere('status', 'pending');
+                                });
                         });
                 });
                 break;
@@ -247,13 +254,19 @@ class AppointmentController extends Controller
                 ->where('status', 'confirmed')
                 ->whereDate('appointment_date', '>=', $now)
                 ->count(),
+            'pending' => (clone $query)
+                ->where('status', 'pending')
+                ->count(),
             'history' => (clone $query)
                 ->where(function($q) use ($now) {
                     $q->where('status', 'completed')
                         ->orWhere('status', 'cancelled')
                         ->orWhere(function($q) use ($now) {
                             $q->whereDate('appointment_date', '<', $now)
-                                ->where('status', 'confirmed');
+                                ->where(function($q) {
+                                    $q->where('status', 'confirmed')
+                                        ->orWhere('status', 'pending');
+                                });
                         });
                 })
                 ->count(),

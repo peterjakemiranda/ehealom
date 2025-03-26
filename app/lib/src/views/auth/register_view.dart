@@ -20,7 +20,7 @@ class _RegisterViewState extends State<RegisterView> {
   final _confirmPasswordController = TextEditingController();
   final _ageController = TextEditingController();
   final _studentIdController = TextEditingController();
-  final _departmentController = TextEditingController();
+  String _selectedDepartment = '';
   final _courseController = TextEditingController();
   final _majorController = TextEditingController();
   final _yearLevelController = TextEditingController();
@@ -28,9 +28,30 @@ class _RegisterViewState extends State<RegisterView> {
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
-  String _selectedUserType = 'student'; // changed from 'citizen'
+  String _selectedUserType = 'student';
   String _selectedSex = 'male';
   String _selectedMaritalStatus = 'single';
+
+  // Base department options
+  final List<Map<String, String>> _baseDepatments = [
+    {'value': 'DCS', 'label': 'DCS – Department of Computer Studies'},
+    {'value': 'DBM', 'label': 'DBM - Department of Business and Management'},
+    {'value': 'DIT', 'label': 'DIT – Department of Industrial Technology'},
+    {'value': 'DGTT', 'label': 'DGTT – Department of General Teacher Training'},
+    {'value': 'CCJE', 'label': 'CCJE – College of Criminal Justice Education'},
+  ];
+
+  // School Admin option for personnel only
+  final Map<String, String> _schoolAdminDept = 
+    {'value': 'SA', 'label': 'School Admin'};
+
+  List<Map<String, String>> get _departments {
+    final depts = List<Map<String, String>>.from(_baseDepatments);
+    if (_selectedUserType == 'personnel') {
+      depts.add(_schoolAdminDept);
+    }
+    return depts;
+  }
 
   @override
   void dispose() {
@@ -41,7 +62,6 @@ class _RegisterViewState extends State<RegisterView> {
     _confirmPasswordController.dispose();
     _ageController.dispose();
     _studentIdController.dispose();
-    _departmentController.dispose();
     _courseController.dispose();
     _majorController.dispose();
     _yearLevelController.dispose();
@@ -72,14 +92,14 @@ class _RegisterViewState extends State<RegisterView> {
         userData.addAll({
           'student_id': _studentIdController.text,
           'year_level': _yearLevelController.text,
-          'department': _departmentController.text,
+          'department': _selectedDepartment,
           'course': _courseController.text,
           'major': _majorController.text,
         });
       } else if (_selectedUserType == 'personnel') {
         userData.addAll({
           'academic_rank': _academicRankController.text,
-          'department': _departmentController.text,
+          'department': _selectedDepartment,
         });
       }
 
@@ -123,7 +143,11 @@ class _RegisterViewState extends State<RegisterView> {
         DropdownMenuItem(value: 'personnel', child: Text('Campus Personnel')),
       ],
       onChanged: (value) {
-        setState(() => _selectedUserType = value!);
+        setState(() {
+          _selectedUserType = value!;
+          // Reset department selection when switching user type
+          _selectedDepartment = '';
+        });
       },
       validator: (value) => value == null ? 'Please select a user type' : null,
     );
@@ -263,16 +287,31 @@ class _RegisterViewState extends State<RegisterView> {
                         },
                       ),
                       const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _departmentController,
+                      DropdownButtonFormField<String>(
                         decoration: const InputDecoration(
                           labelText: 'Department',
                           border: OutlineInputBorder(),
                           prefixIcon: Icon(Icons.business),
                         ),
+                        isExpanded: true,
+                        menuMaxHeight: 300,
+                        value: _selectedDepartment.isEmpty ? null : _selectedDepartment,
+                        items: _departments.map((department) {
+                          return DropdownMenuItem(
+                            value: department['value'],
+                            child: Text(
+                              department['label']!,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 14),
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          setState(() => _selectedDepartment = value!);
+                        },
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Please enter your department';
+                            return 'Please select your department';
                           }
                           return null;
                         },
@@ -318,16 +357,31 @@ class _RegisterViewState extends State<RegisterView> {
                         },
                       ),
                       const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _departmentController,
+                      DropdownButtonFormField<String>(
                         decoration: const InputDecoration(
                           labelText: 'Department',
                           border: OutlineInputBorder(),
                           prefixIcon: Icon(Icons.business),
                         ),
+                        isExpanded: true,
+                        menuMaxHeight: 300,
+                        value: _selectedDepartment.isEmpty ? null : _selectedDepartment,
+                        items: _departments.map((department) {
+                          return DropdownMenuItem(
+                            value: department['value'],
+                            child: Text(
+                              department['label']!,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 14),
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          setState(() => _selectedDepartment = value!);
+                        },
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Please enter your department';
+                            return 'Please select your department';
                           }
                           return null;
                         },
