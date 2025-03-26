@@ -57,13 +57,8 @@ class AppointmentController extends Controller
         $now = now();
         switch ($request->get('status')) {
             case 'upcoming':
-                $query->where(function($q) use ($now) {
-                    $q->where(function($q) {
-                        $q->where('status', 'confirmed')
-                            ->orWhere('status', 'pending');
-                    })
+                $query->where('status', 'confirmed')
                     ->whereDate('appointment_date', '>=', $now);
-                });
                 break;
             case 'pending':
                 $query->where('status', 'pending');
@@ -245,6 +240,22 @@ class AppointmentController extends Controller
             $query->where('student_id', $user->id);
         } elseif ($user->hasRole('counselor')) {
             $query->where('counselor_id', $user->id);
+            
+            // Apply user type filter for counselors
+            if ($request->has('user_type') && $request->user_type !== 'all') {
+                $role = $request->user_type === 'student' ? 'student' : 'personnel';
+                $query->whereHas('student.roles', function($q) use ($role) {
+                    $q->where('name', $role);
+                });
+            }
+
+            // Apply search filter for counselors
+            if ($request->has('search') && !empty($request->search)) {
+                $search = $request->search;
+                $query->whereHas('student', function($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%");
+                });
+            }
         }
 
         $now = now();
