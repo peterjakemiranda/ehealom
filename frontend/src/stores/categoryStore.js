@@ -125,6 +125,20 @@ export const useCategoryStore = defineStore({
       } finally {
         this.isLoading = false;
       }
+    },
+
+    async deleteCategory(uuid) {
+      this.isLoading = true;
+      try {
+        await http.delete(`/api/categories/${uuid}`);
+        this.categories = this.categories.filter(c => c.uuid !== uuid);
+        handleSuccess('Category deleted successfully');
+      } catch (error) {
+        handleError(error);
+        throw error;
+      } finally {
+        this.isLoading = false;
+      }
     }
   }
 });

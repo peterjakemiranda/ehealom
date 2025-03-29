@@ -24,47 +24,6 @@
         ></textarea>
       </div>
 
-      <!-- Tag Input -->
-      <div class="form-control mb-4">
-        <label class="label">
-          <span class="label-text text-gray-700">Tags</span>
-        </label>
-        <div class="relative">
-          <div class="flex flex-wrap gap-2 p-2 border rounded-lg bg-gray-50 min-h-[3rem]">
-            <!-- Selected Tags -->
-            <div v-for="tag in selectedTags" :key="tag"
-                 class="badge badge-primary gap-1">
-              {{ tag }}
-              <button type="button" @click="removeTag(tag)" class="btn btn-ghost btn-xs px-1">
-                ×
-              </button>
-            </div>
-            
-            <!-- Input -->
-            <input
-              v-model="tagInput"
-              @keydown.enter.prevent="addTag"
-              @keydown.backspace="handleBackspace"
-              @focus="showSuggestions = true"
-              type="text"
-              class="input input-ghost input-sm flex-1 min-w-[100px]"
-              placeholder="Type to add tags..."
-            />
-          </div>
-
-          <!-- Suggestions Dropdown -->
-          <div v-if="showSuggestions && filteredSuggestions.length > 0"
-               class="suggestions-dropdown absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg">
-            <div v-for="suggestion in filteredSuggestions" 
-                 :key="suggestion"
-                 @click="selectSuggestion(suggestion)"
-                 class="px-4 py-2 hover:bg-gray-100 cursor-pointer">
-              {{ suggestion }}
-            </div>
-          </div>
-        </div>
-      </div>
-
       <div class="form-control mb-4">
         <label class="label">
           <span class="label-text text-gray-700">Category Image</span>
@@ -112,23 +71,6 @@ const props = defineProps({
 const emit = defineEmits(['save', 'cancel'])
 const isLoading = ref(false)
 const imagePreview = ref(null)
-const tagInput = ref('')
-const selectedTags = ref([])
-const showSuggestions = ref(false)
-
-// Example tag suggestions - you can replace with your own list
-const tagSuggestions = [
-  'Anxiety', 'Depression', 'Stress', 'Self-Care', 'Mindfulness',
-  'Relationships', 'Academic', 'Career', 'Personal Growth', 'Wellness'
-]
-
-const filteredSuggestions = computed(() => {
-  if (!tagInput.value) return []
-  return tagSuggestions.filter(tag => 
-    tag.toLowerCase().includes(tagInput.value.toLowerCase()) &&
-    !selectedTags.value.includes(tag)
-  )
-})
 
 const formData = ref({
   uuid: props.category.uuid || crypto.randomUUID(),
@@ -137,47 +79,11 @@ const formData = ref({
   image: null
 })
 
-function addTag() {
-  const tag = tagInput.value.trim()
-  if (tag && !selectedTags.value.includes(tag)) {
-    selectedTags.value.push(tag)
-  }
-  tagInput.value = ''
-}
-
-function removeTag(tag) {
-  selectedTags.value = selectedTags.value.filter(t => t !== tag)
-}
-
-function selectSuggestion(tag) {
-  if (!selectedTags.value.includes(tag)) {
-    selectedTags.value.push(tag)
-  }
-  tagInput.value = ''
-  showSuggestions.value = false
-}
-
-function handleBackspace(event) {
-  if (!tagInput.value && selectedTags.value.length > 0) {
-    event.preventDefault()
-    selectedTags.value.pop()
-  }
-}
-
-// Handle click outside manually
-function handleClickOutside(event) {
-  const dropdown = document.querySelector('.suggestions-dropdown')
-  if (dropdown && !dropdown.contains(event.target)) {
-    showSuggestions.value = false
-  }
-}
-
 onMounted(() => {
-  document.addEventListener('click', handleClickOutside)
+  // No need for click outside handler anymore
 })
 
 onUnmounted(() => {
-  document.removeEventListener('click', handleClickOutside)
   if (imagePreview.value && !imagePreview.value.includes('http')) {
     URL.revokeObjectURL(imagePreview.value)
   }
@@ -219,6 +125,18 @@ async function onSubmit() {
     await emit('save', { ...formData.value })
   } finally {
     isLoading.value = false
+    // Reset form data
+    formData.value = {
+      uuid: props.category.uuid || crypto.randomUUID(),
+      title: '',
+      description: '',
+      image: null
+    }
+    // Clear image preview
+    if (imagePreview.value && !imagePreview.value.includes('http')) {
+      URL.revokeObjectURL(imagePreview.value)
+    }
+    imagePreview.value = null
   }
 }
 </script>

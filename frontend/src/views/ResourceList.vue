@@ -101,7 +101,11 @@
             >
               Edit
             </button>
-            <button v-if="showDeleteButton" @click="deleteResource(resource)" class="btn btn-sm btn-ghost">
+            <button 
+              v-if="showDeleteButton" 
+              @click="confirmDelete(resource)" 
+              class="btn btn-error btn-sm"
+            >
               Delete
             </button>
           </div>
@@ -275,8 +279,24 @@ function changePage(page) {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
-function deleteResource(resource) {
-  // Implement the delete logic here
-  console.log('Deleting resource:', resource)
+async function confirmDelete(resource) {
+  try {
+    const result = await swalHelper.confirm({
+      title: 'Delete Resource',
+      text: `Are you sure you want to delete "${resource.title}"? This action cannot be undone.`,
+      icon: 'warning',
+      confirmButtonText: 'Yes, delete it!',
+      confirmButtonColor: '#ef4444'
+    })
+
+    if (result.isConfirmed) {
+      await resourceStore.deleteResource(resource.uuid)
+      swalHelper.toast('success', 'Resource deleted successfully')
+      await fetchResources()
+    }
+  } catch (error) {
+    console.error('Failed to delete resource:', error)
+    swalHelper.toast('error', 'Failed to delete resource')
+  }
 }
 </script> 

@@ -78,6 +78,12 @@
             >
               Edit Category
             </button>
+            <button 
+              class="btn btn-error btn-sm" 
+              @click="confirmDelete(category)"
+            >
+              Delete
+            </button>
           </div>
         </div>
       </div>
@@ -226,13 +232,13 @@ function closeDrawer() {
 async function handleSave(categoryData) {
   try {
     if (isEditing.value) {
-      await categoryStore.updateCategory(categoryData.uuid, categoryData) // Change id to uuid
+      await categoryStore.updateCategory(categoryData.uuid, categoryData)
       swalHelper.toast('success', 'Category updated successfully')
     } else {
       await categoryStore.addCategory(categoryData)
       swalHelper.toast('success', 'Category created successfully')
     }
-    closeDrawer()
+    closeDrawer() // Close drawer first
     await fetchCategories(categoryStore.pagination.current_page)
   } catch (error) {
     console.error('Category save error:', error)
@@ -262,4 +268,25 @@ function calculateSyncStatus(category) {
 const pendingSync = computed(() => {
   return categoryStore.categories.some(cat => calculateSyncStatus(cat) === 'pending');
 });
+
+async function confirmDelete(category) {
+  try {
+    const result = await swalHelper.confirm({
+      title: 'Delete Category',
+      text: `Are you sure you want to delete "${category.title}"? This action cannot be undone.`,
+      icon: 'warning',
+      confirmButtonText: 'Yes, delete it!',
+      confirmButtonColor: '#ef4444'
+    })
+
+    if (result.isConfirmed) {
+      await categoryStore.deleteCategory(category.uuid)
+      swalHelper.toast('success', 'Category deleted successfully')
+      await fetchCategories()
+    }
+  } catch (error) {
+    console.error('Failed to delete category:', error)
+    swalHelper.toast('error', 'Failed to delete category')
+  }
+}
 </script>
