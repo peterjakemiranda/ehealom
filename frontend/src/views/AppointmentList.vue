@@ -13,42 +13,40 @@
     </div>
 
     <!-- Counselor Filters -->
-    <div v-if="isCounselor" class="mb-6 space-y-4">
-      <!-- User Type Filter -->
-      <div class="form-control">
-        <label class="label">
-          <span class="label-text text-gray-700">Filter by User Type</span>
-        </label>
-        <select 
-          v-model="selectedUserType" 
-          class="select select-bordered bg-gray-50"
-          @change="handleFiltersChange"
-        >
-          <option value="all">All Users</option>
-          <option value="student">Students</option>
-          <option value="personnel">Personnel</option>
-        </select>
-      </div>
-
-      <!-- Department Filter (for students) -->
-      <div v-if="selectedUserType === 'student'" class="form-control">
-        <label class="label">
-          <span class="label-text text-gray-700">Filter by Department</span>
-        </label>
-        <select 
-          v-model="selectedDepartment" 
-          class="select select-bordered bg-gray-50"
-          @change="handleFiltersChange"
-        >
-          <option value="">All Departments</option>
-          <option 
-            v-for="dept in departments" 
-            :key="dept" 
-            :value="dept"
+    <div v-if="isCounselor" class="mb-6">
+      <div class="flex flex-wrap gap-4 items-center">
+        <!-- User Type Filter -->
+        <div class="form-control">
+          <select 
+            v-model="selectedUserType" 
+            class="select select-bordered bg-gray-50"
+            @change="handleFiltersChange"
           >
-            {{ dept }}
-          </option>
-        </select>
+            <option value="all">All Users</option>
+            <option value="student">Students</option>
+            <option value="personnel">Personnel</option>
+          </select>
+        </div>
+
+        <!-- Search by Name -->
+        <div class="form-control flex-1">
+          <div class="relative">
+            <input
+              v-model="searchQuery"
+              type="text"
+              placeholder="Search by name..."
+              class="input input-bordered w-full bg-gray-50"
+              @input="handleFiltersChange"
+            />
+            <button
+              v-if="searchQuery"
+              @click="clearSearch"
+              class="absolute right-2 top-1/2 -translate-y-1/2 btn btn-ghost btn-sm"
+            >
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -64,7 +62,7 @@
               ? 'bg-primary text-white' 
               : 'text-gray-600 hover:bg-gray-100'
           ]"
-          @click="statusFilter = filter.value"
+          @click="handleStatusFilterChange(filter.value)"
         >
           {{ filter.label }} ({{ counts[filter.value] || 0 }})
         </button>
@@ -150,20 +148,20 @@ const appointmentStore = useAppointmentStore()
 const authStore = useAuthStore()
 const showDrawer = ref(false)
 const selectedAppointment = ref({})
-const statusFilter = ref('upcoming')
+const statusFilter = ref('pending')
+const searchQuery = ref('')
 const counts = ref({
   upcoming: 0,
+  pending: 0,
   history: 0
 })
 
 const selectedUserType = ref('all')
-const selectedDepartment = ref('')
-const departments = ref([])
-
 const isStudent = computed(() => authStore.user?.user_type === 'student')
-const isCounselor = computed(() => authStore.user?.user_type === 'counselor')
+const isCounselor = computed(() => authStore.user?.roles.includes('counselor'))
 
 const statusFilters = [
+  { value: 'pending', label: 'Pending' },
   { value: 'upcoming', label: 'Upcoming' },
   { value: 'history', label: 'History' }
 ]
@@ -196,14 +194,15 @@ watch(statusFilter, () => {
   fetchAppointments()
 })
 
-onMounted(async () => {
-  try {
-    const response = await http.get('/api/appointments/departments')
-    departments.value = response.data
-  } catch (error) {
-    console.error('Failed to fetch departments:', error)
-  }
-})
+function clearSearch() {
+  searchQuery.value = ''
+  handleFiltersChange()
+}
+
+function handleStatusFilterChange(value) {
+  statusFilter.value = value
+  fetchAppointments(1)
+}
 
 async function fetchAppointments(page = 1) {
   try {
@@ -214,16 +213,17 @@ async function fetchAppointments(page = 1) {
 
     if (isCounselor.value) {
       if (selectedUserType.value !== 'all') {
-        filters.userType = selectedUserType.value
+        filters.user_type = selectedUserType.value
       }
-      if (selectedDepartment.value) {
-        filters.department = selectedDepartment.value
+      if (searchQuery.value) {
+        filters.search = searchQuery.value
       }
     }
 
+    console.log('Fetching with filters:', filters)
     await Promise.all([
       appointmentStore.fetchAppointments(filters),
-      fetchCounts()
+      fetchCounts(filters)
     ])
   } catch (error) {
     console.error('Failed to fetch appointments:', error)
@@ -255,8 +255,10 @@ function editAppointment(appointment) {
 
 async function handleStatusUpdate(appointment, newStatus) {
   try {
-    await appointmentStore.updateAppointmentStatus(appointment.id, newStatus)
+    await appointmentStore.updateAppointmentStatus(appointment.uuid, newStatus)
     await fetchCounts()
+    //fetch appointments
+    await fetchAppointments()
     swalHelper.toast('success', 'Appointment status updated')
   } catch (error) {
     console.error('Failed to update status:', error)
@@ -296,8 +298,7 @@ const canConfirmAppointment = (appointment) => {
 
 const canCompleteAppointment = (appointment) => {
   return canManageAppointments.value && 
-    appointment.status === 'confirmed' &&
-    new Date(appointment.appointment_date) <= new Date()
+    appointment.status === 'confirmed'
 }
 
 const canEditAppointment = (appointment) => {
@@ -307,9 +308,10 @@ const canEditAppointment = (appointment) => {
   return canManageAppointments.value && ['pending', 'confirmed'].includes(appointment.status)
 }
 
-async function fetchCounts() {
+async function fetchCounts(filters = {}) {
   try {
-    const response = await http.get('/api/appointments/counts')
+    console.log('Fetching counts with filters:', filters)
+    const response = await http.get('/api/appointments/counts', { params: filters })
     counts.value = response.data
   } catch (error) {
     console.error('Failed to fetch counts:', error)
@@ -320,7 +322,12 @@ function handleFiltersChange() {
   fetchAppointments(1)
 }
 
-watch([selectedUserType, selectedDepartment], () => {
+watch([selectedUserType, searchQuery, statusFilter], ([newUserType, newSearch, newStatus], [oldUserType, oldSearch, oldStatus]) => {
+  console.log('Filter changed:', {
+    userType: { old: oldUserType, new: newUserType },
+    search: { old: oldSearch, new: newSearch },
+    status: { old: oldStatus, new: newStatus }
+  })
   handleFiltersChange()
 })
 </script>

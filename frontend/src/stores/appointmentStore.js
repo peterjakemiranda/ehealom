@@ -31,14 +31,29 @@ export const useAppointmentStore = defineStore({
   },
 
   actions: {
-    async fetchAppointments({ page = 1, status = '', date = '', perPage = 10 } = {}) {
+    async fetchAppointments({ 
+      page = 1, 
+      status = '', 
+      date = '', 
+      perPage = 10,
+      user_type = '',
+      search = ''
+    } = {}) {
       this.isLoading = true
       this.error = null
 
       try {
-        const response = await http.get('/api/appointments', {
-          params: { page, status, date, per_page: perPage }
-        })
+        const params = { 
+          page, 
+          per_page: perPage,
+          ...(status && { status }),
+          ...(date && { date }),
+          ...(user_type && { user_type }),
+          ...(search && { search })
+        }
+
+        console.log('Fetching appointments with params:', params)
+        const response = await http.get('/api/appointments', { params })
         
         this.appointments = response.data.data
         this.pagination = response.data.meta
@@ -132,7 +147,8 @@ export const useAppointmentStore = defineStore({
         this.availableSlots = data.slots
         return data.slots
       } catch (error) {
-        handleError(error)
+        // handleError(error)
+        console.error('Error fetching available slots:', error)
         throw error
       } finally {
         this.isLoading = false

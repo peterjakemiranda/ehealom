@@ -330,11 +330,6 @@ const newStudent = ref({
 // Get counselors from userStore
 onMounted(async () => {
   try {
-    console.log('Component mounted, initial state:', {
-      isCounselor: isCounselor.value,
-      currentUserId: authStore.user?.user?.id,
-      appointment: props.appointment
-    })
 
     // Fetch both counselors and categories
     const [counselorsData, categoriesData] = await Promise.all([
@@ -364,9 +359,9 @@ onMounted(async () => {
       await loadAvailableSlots()
     } else if (isCounselor.value) {
       // Set counselor_id to current user for new appointments
-      console.log('Setting counselor_id for new appointment')
+      // console.log('Setting counselor_id for new appointment')
       formData.value.counselor_id = authStore.user?.user?.id
-      console.log('Updated formData:', formData.value)
+      // console.log('Updated formData:', formData.value)
     }
   } catch (error) {
     console.error('Failed to fetch data:', error)

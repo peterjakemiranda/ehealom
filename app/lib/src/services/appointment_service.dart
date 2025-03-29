@@ -205,14 +205,24 @@ class AppointmentService {
     }
   }
 
-  Future<Map<String, int>> getAppointmentCounts() async {
+  Future<Map<String, int>> getAppointmentCounts({
+    String? userType,
+    String? search,
+  }) async {
     try {
       debugPrint('🔍 Fetching appointment counts...');
       final token = await _authService.getToken();
       if (token == null) throw Exception('No authentication token found');
 
+      final queryParams = {
+        if (userType != null) 'user_type': userType,
+        if (search != null && search.isNotEmpty) 'search': search,
+      };
+
       final response = await _client.get(
-        Uri.parse('${ApiConfig.baseUrl}/appointments/counts'),
+        Uri.parse('${ApiConfig.baseUrl}/appointments/counts').replace(
+          queryParameters: queryParams,
+        ),
         headers: {
           'Authorization': 'Bearer $token',
           'Accept': 'application/json',
@@ -227,8 +237,7 @@ class AppointmentService {
         return {
           'upcoming': data['upcoming'] ?? 0,
           'pending': data['pending'] ?? 0,
-          'past': data['past'] ?? 0,
-          'cancelled': data['cancelled'] ?? 0,
+          'history': data['history'] ?? 0,
         };
       } else {
         throw Exception('Failed to load appointment counts: ${response.statusCode}');

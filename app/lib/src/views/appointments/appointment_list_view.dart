@@ -111,12 +111,15 @@ class _AppointmentListViewState extends State<AppointmentListView> {
 
   Future<void> _loadCounts() async {
     try {
-      final counts = await _appointmentService.getAppointmentCounts();
+      final counts = await _appointmentService.getAppointmentCounts(
+        userType: _selectedUserType != 'all' ? _selectedUserType : null,
+        search: _searchQuery.isNotEmpty ? _searchQuery : null,
+      );
       setState(() {
         _counts = {
           'pending': counts['pending'] ?? 0,
           'upcoming': counts['upcoming'] ?? 0,
-          'history': (counts['past'] ?? 0) + (counts['cancelled'] ?? 0),
+          'history': counts['history'] ?? 0,
         };
       });
     } catch (e) {
@@ -150,6 +153,7 @@ class _AppointmentListViewState extends State<AppointmentListView> {
                 _searchController.clear();
               });
               _loadAppointments();
+              _loadCounts();
             },
           ),
 
@@ -171,6 +175,7 @@ class _AppointmentListViewState extends State<AppointmentListView> {
                           _searchQuery = '';
                         });
                         _loadAppointments();
+                        _loadCounts();
                       },
                     )
                   : null,
@@ -182,6 +187,7 @@ class _AppointmentListViewState extends State<AppointmentListView> {
             },
             onSubmitted: (value) {
               _loadAppointments();
+              _loadCounts();
             },
           ),
         ],
@@ -238,6 +244,7 @@ class _AppointmentListViewState extends State<AppointmentListView> {
             _selectedFilter = filterKey;
           });
           _loadAppointments();
+          _loadCounts();
         },
         showCheckmark: false,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),

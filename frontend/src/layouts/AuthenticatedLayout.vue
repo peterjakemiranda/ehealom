@@ -566,7 +566,7 @@ const visibleNavigation = computed(() => {
 })
 
 // Add a debug log to check permissions
-console.log('User Permissions:', authStore.user?.permissions)
+// console.log('User Permissions:', authStore.user?.permissions)
 
 </script>
 
