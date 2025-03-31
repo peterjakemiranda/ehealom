@@ -27,11 +27,21 @@ export const useCategoryStore = defineStore({
   },
 
   actions: {
-    async fetchCategories() {
+    async fetchCategories({ page = 1, search = '', perPage = 10 } = {}) {
       this.isLoading = true;
       try {
-        const response = await http.get('/api/categories');
+        const params = new URLSearchParams({
+          page,
+          per_page: perPage
+        });
+
+        if (search) {
+          params.append('search', search);
+        }
+
+        const response = await http.get(`/api/categories?${params.toString()}`);
         this.categories = response.data.data;
+        this.pagination = response.data.meta;
         return this.categories;
       } catch (error) {
         handleError(error);

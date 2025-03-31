@@ -155,8 +155,8 @@ const selectedCategory = ref(null)
 const isEditing = computed(() => !!selectedCategory.value?.uuid) // Change this line
 
 // Create debounced search function
-const debouncedSearch = debounce(() => {
-  fetchCategories(1) // Reset to first page when searching
+const debouncedSearch = debounce(async () => {
+  await fetchCategories(1)
 }, 300)
 
 // Watch for search query changes
@@ -175,6 +175,7 @@ onMounted(async () => {
 onUnmounted(() => {
   window.removeEventListener('online', handleNetworkChange)
   window.removeEventListener('offline', handleNetworkChange)
+  debouncedSearch.cancel()
 })
 
 // Main fetch function
@@ -245,11 +246,6 @@ async function handleSave(categoryData) {
     swalHelper.toast('error', `Failed to ${isEditing.value ? 'update' : 'create'} category`)
   }
 }
-
-// Clean up debounce on component unmount
-onUnmounted(() => {
-  debouncedSearch.cancel()
-})
 
 function handleNetworkChange() {
   isOnline.value = navigator.onLine

@@ -329,4 +329,24 @@ class AppointmentController extends Controller
         return response()->json($departments);
     }
 
+    /**
+     * Remove the specified appointment.
+     */
+    public function destroy(Appointment $appointment)
+    {
+        // Check if user has permission to delete this appointment
+        $user = request()->user();
+        
+        // Only admin can delete appointments
+        if (!$user->hasRole('counselor')) {
+            abort(403, 'Unauthorized to delete appointments');
+        }
+
+        // Delete the appointment
+        $appointment->delete();
+
+        return response()->json([
+            'message' => 'Appointment deleted successfully'
+        ]);
+    }
 } 

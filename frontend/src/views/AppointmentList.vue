@@ -105,6 +105,13 @@
                 >
                   Edit
                 </button>
+                <button 
+                  v-if="canDeleteAppointment(appointment)"
+                  @click="confirmDeleteAppointment(appointment)"
+                  class="btn btn-error btn-sm"
+                >
+                  <TrashIcon class="w-4 h-4" />
+                </button>
               </div>
             </template>
           </AppointmentCard>
@@ -143,6 +150,7 @@ import AppointmentForm from '@/components/AppointmentForm.vue'
 import Drawer from '@/components/common/BaseDrawer.vue'
 import { swalHelper } from '@/utils/swalHelper'
 import http from '@/utils/http'
+import { TrashIcon } from '@heroicons/vue/24/outline';
 
 const appointmentStore = useAppointmentStore()
 const authStore = useAuthStore()
@@ -306,6 +314,32 @@ const canEditAppointment = (appointment) => {
     return appointment.status === 'pending' && appointment.student_id === authStore.user?.id
   }
   return canManageAppointments.value && ['pending', 'confirmed'].includes(appointment.status)
+}
+
+const canDeleteAppointment = (appointment) => {
+  return authStore.user?.roles?.includes('counselor');
+}
+
+async function confirmDeleteAppointment(appointment) {
+  try {
+    const result = await swalHelper.confirm({
+      title: 'Delete Appointment',
+      text: `Are you sure you want to delete this appointment? This action cannot be undone.`,
+      icon: 'warning',
+      confirmButtonText: 'Yes, delete it!',
+      confirmButtonColor: '#ef4444'
+    })
+
+    if (result.isConfirmed) {
+      await appointmentStore.deleteAppointment(appointment.uuid)
+      swalHelper.toast('success', 'Appointment deleted successfully')
+      await fetchAppointments()
+      await fetchCounts()
+    }
+  } catch (error) {
+    console.error('Failed to delete appointment:', error)
+    swalHelper.toast('error', 'Failed to delete appointment')
+  }
 }
 
 async function fetchCounts(filters = {}) {

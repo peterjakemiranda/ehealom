@@ -22,21 +22,31 @@
         >
           <option value="">All Categories</option>
           <option v-for="category in categories" 
-                  :key="category.id" 
-                  :value="category.id">
+                  :key="category.uuid" 
+                  :value="category.uuid">
             {{ category.title }}
           </option>
         </select>
       </div>
 
-      <input 
-        ref="searchInput"
-        type="text"
-        v-model="searchQuery"
-        placeholder="Search resources..."
-        class="input input-bordered w-full max-w-xs"
-        :disabled="resourceStore.isLoading"
-      />
+      <div class="flex gap-2">
+        <input 
+          ref="searchInput"
+          type="text"
+          v-model="searchQuery"
+          placeholder="Search resources..."
+          class="input input-bordered w-full max-w-xs"
+          :disabled="resourceStore.isLoading"
+        />
+        <button 
+          v-if="selectedCategory || searchQuery"
+          @click="clearFilters"
+          class="btn btn-ghost"
+          :disabled="resourceStore.isLoading"
+        >
+          Clear Filters
+        </button>
+      </div>
     </div>
 
     <!-- Loading State -->
@@ -195,10 +205,8 @@ const isAdmin = computed(() => authStore.user?.roles?.includes('admin'))
 const isEditing = computed(() => !!selectedResource.value?.uuid)
 
 // Create debounced search function
-const debouncedSearch = debounce(async (value) => {
+const debouncedSearch = debounce(async () => {
   await fetchResources(1)
-  // Refocus the input after search is complete
-  searchInput.value?.focus()
 }, 300)
 
 // Load categories on mount
@@ -208,13 +216,8 @@ onMounted(async () => {
 })
 
 // Watch for filter changes
-watch(selectedCategory, () => {
-  fetchResources(1)
-})
-
-// Separate watch for search query with debounce
-watch(searchQuery, (newValue) => {
-  debouncedSearch(newValue)
+watch([selectedCategory, searchQuery], () => {
+  debouncedSearch()
 })
 
 // Clean up debounce on component unmount
@@ -225,8 +228,8 @@ onUnmounted(() => {
 async function fetchResources(page = 1) {
   await resourceStore.fetchResources({
     page,
-    category: selectedCategory.value,
-    search: searchQuery.value
+    category: selectedCategory.value || undefined,
+    search: searchQuery.value || undefined
   })
 }
 
@@ -298,5 +301,11 @@ async function confirmDelete(resource) {
     console.error('Failed to delete resource:', error)
     swalHelper.toast('error', 'Failed to delete resource')
   }
+}
+
+function clearFilters() {
+  selectedCategory.value = ''
+  searchQuery.value = ''
+  fetchResources(1)
 }
 </script> 

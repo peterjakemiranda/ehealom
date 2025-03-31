@@ -14,12 +14,12 @@ class ResourceController extends Controller
     public function index(Request $request)
     {
         $query = Resource::with('categories')
-            ->when($request->has('category'), function ($query) use ($request) {
+            ->when($request->has('category') && $request->category !== '', function ($query) use ($request) {
                 $query->whereHas('categories', function ($q) use ($request) {
                     $q->where('uuid', $request->category);
                 });
             })
-            ->when($request->has('search'), function ($query) use ($request) {
+            ->when($request->has('search') && $request->search !== '', function ($query) use ($request) {
                 $search = $request->search;
                 $query->where(function($q) use ($search) {
                     $q->where('title', 'like', "%{$search}%")

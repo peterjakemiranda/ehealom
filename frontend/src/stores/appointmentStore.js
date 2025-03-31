@@ -135,6 +135,18 @@ export const useAppointmentStore = defineStore({
       }
     },
 
+    async deleteAppointment(uuid) {
+      try {
+        await http.delete(`/api/appointments/${uuid}`)
+        // Remove from local list
+        this.appointments = this.appointments.filter(a => a.uuid !== uuid)
+        handleSuccess('Appointment deleted successfully')
+      } catch (error) {
+        handleError(error)
+        throw error
+      }
+    },
+
     async fetchAvailableSlots(counselorId, date) {
       this.isLoading = true
       try {
