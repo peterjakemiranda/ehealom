@@ -240,7 +240,7 @@ class _HomeViewState extends State<HomeView> {
   Widget _buildUpcomingAppointment() {
     // Filter for confirmed appointments only
     final confirmedAppointments = _upcomingAppointments
-        .where((apt) => apt.status.toLowerCase() == 'confirmed')
+        .where((apt) => apt.status.toLowerCase() == 'confirmed' || apt.status.toLowerCase() == 'pending')
         .toList();
 
     if (confirmedAppointments.isEmpty) {

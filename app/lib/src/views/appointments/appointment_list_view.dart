@@ -323,8 +323,12 @@ class _AppointmentCard extends StatelessWidget {
     final authController = Provider.of<AuthController>(context);
     final roles = authController.user?['user']?['roles'] as List<dynamic>?;
     final isCounselor = roles?.any((role) => role['name'] == 'counselor') ?? false;
+    final isStudent = roles?.any((role) => role['name'] == 'student') ?? false;
+    final isOwnAppointment = authController.user?['user']?['id'] == appointment.studentId;
     final canUpdateStatus = isCounselor && 
         ['pending', 'confirmed'].contains(appointment.status.toLowerCase());
+    final canCancel = (isStudent && isOwnAppointment && 
+        ['pending', 'confirmed'].contains(appointment.status.toLowerCase()));
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -367,6 +371,14 @@ class _AppointmentCard extends StatelessWidget {
                           icon: const Icon(Icons.more_vert),
                           onSelected: (String status) => _updateStatus(context, status),
                           itemBuilder: (BuildContext context) => _buildStatusMenuItems(),
+                        ),
+                      ],
+                      if (canCancel) ...[
+                        const SizedBox(width: 8),
+                        IconButton(
+                          icon: const Icon(Icons.cancel, color: Colors.red),
+                          onPressed: () => _confirmCancel(context),
+                          tooltip: 'Cancel appointment',
                         ),
                       ],
                     ],
@@ -511,5 +523,29 @@ class _AppointmentCard extends StatelessWidget {
 
   String _formatDate(DateTime date) {
     return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _confirmCancel(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancel Appointment'),
+        content: const Text('Are you sure you want to cancel this appointment?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('No'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Yes'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await _updateStatus(context, 'cancelled');
+    }
   }
 } 
