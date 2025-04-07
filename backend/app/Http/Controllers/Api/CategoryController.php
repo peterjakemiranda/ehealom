@@ -11,9 +11,26 @@ use Illuminate\Support\Facades\Storage;
 
 class CategoryController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $categories = Category::orderBy('title')->get();
+        $query = Category::query();
+        
+        // Apply search filter if provided
+        if ($request->has('search') && $request->search !== '') {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                  ->orWhere('description', 'like', "%{$search}%");
+            });
+        }
+        
+        // Order by title
+        $query->orderBy('title');
+        
+        // Paginate results
+        $perPage = $request->input('per_page', 10);
+        $categories = $query->paginate($perPage);
+        
         return CategoryResource::collection($categories);
     }
 
