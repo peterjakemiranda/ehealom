@@ -468,6 +468,13 @@ const navigation = [
         icon: KeyIcon,
         requiresOnline: true,
         requiresPermission: 'manage users'
+      },
+      {
+        name: 'Site Settings',
+        href: '/settings/site',
+        icon: Cog6ToothIcon,
+        requiresOnline: true,
+        requiresPermission: 'manage users'
       }
     ]
   }

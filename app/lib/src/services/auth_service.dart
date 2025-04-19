@@ -190,4 +190,33 @@ class AuthService {
 
     return jsonDecode(response.body);
   }
+
+  Future<bool> updateFCMToken(String fcmToken) async {
+    debugPrint('AuthService: Updating FCM token');
+    final token = await getToken();
+    
+    if (token == null) {
+      debugPrint('AuthService: Cannot update FCM token - user not logged in');
+      return false;
+    }
+    
+    try {
+      final response = await _client.post(
+        Uri.parse('${ApiConfig.baseUrl}/api/notification/token'),
+        headers: _authHeaders(token),
+        body: jsonEncode({'fcm_token': fcmToken}),
+      );
+      
+      if (response.statusCode == 200) {
+        debugPrint('AuthService: FCM token updated successfully');
+        return true;
+      } else {
+        debugPrint('AuthService: Failed to update FCM token - ${response.statusCode}: ${response.body}');
+        return false;
+      }
+    } catch (e) {
+      debugPrint('AuthService: FCM token update error - $e');
+      return false;
+    }
+  }
 }

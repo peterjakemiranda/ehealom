@@ -249,34 +249,53 @@ class AppointmentService {
     }
   }
 
-  Future<void> updateStatus(String appointmentUuid, String status) async {
+  Future<void> updateStatus(String uuid, String status, {String? notes}) async {
     try {
-      debugPrint('📤 Updating appointment status - UUID: $appointmentUuid, New Status: $status');
       final token = await _authService.getToken();
       if (token == null) throw Exception('No authentication token found');
 
+      final Map<String, dynamic> body = {'status': status};
+      if (notes != null) {
+        body['notes'] = notes;
+      }
+
       final response = await _client.put(
-        Uri.parse('${ApiConfig.baseUrl}/appointments/$appointmentUuid'),
+        Uri.parse('${ApiConfig.baseUrl}/appointments/$uuid'),
         headers: {
           'Authorization': 'Bearer $token',
           'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
-        body: jsonEncode({
-          'status': status,
-        }),
+        body: jsonEncode(body),
       );
 
-      debugPrint('📥 Update Status Response Code: ${response.statusCode}');
-      debugPrint('📥 Update Status Response Body: ${response.body}');
+      if (response.statusCode != 200) {
+        throw Exception('Failed to update appointment status: ${response.statusCode}');
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<void> updateLocation(String uuid, String location) async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null) throw Exception('No authentication token found');
+
+      final response = await _client.put(
+        Uri.parse('${ApiConfig.baseUrl}/appointments/$uuid'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'location': location}),
+      );
 
       if (response.statusCode != 200) {
-        final error = jsonDecode(response.body);
-        throw Exception(error['message'] ?? 'Failed to update appointment status');
+        throw Exception('Failed to update meeting link: ${response.statusCode}');
       }
-    } catch (e, stackTrace) {
-      debugPrint('❌ Error updating appointment status: $e');
-      debugPrint('❌ Stack trace: $stackTrace');
+    } catch (e) {
       rethrow;
     }
   }

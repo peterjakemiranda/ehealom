@@ -64,43 +64,71 @@ class _AppointmentListViewState extends State<AppointmentListView> {
     return AppScaffold(
       title: const Text('Appointments'),
       currentIndex: appointmentsIndex,
-      body: Column(
-        children: [
-          // Add filters at the top for counselors
-          if (isCounselor) _buildFilters(),
-          
-          // Status filter chips
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-            child: Row(
-              children: [
-                _buildFilterChip('Pending'),
-                _buildFilterChip('Upcoming'),
-                _buildFilterChip('History'),
-              ],
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Add filters at the top for counselors
+            if (isCounselor) _buildFilters(),
+            
+            // Status filter chips
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  _buildFilterChip('Pending'),
+                  _buildFilterChip('Upcoming'),
+                  _buildFilterChip('History'),
+                ],
+              ),
             ),
-          ),
 
-          // Appointments list
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _appointments.isEmpty
-                    ? const Center(child: Text('No appointments found'))
-                    : ListView.builder(
-                        itemCount: _appointments.length,
-                        padding: const EdgeInsets.all(16),
-                        itemBuilder: (context, index) {
-                          final appointment = _appointments[index];
-                          return _AppointmentCard(
-                            appointment: appointment,
-                            onTap: () => _showAppointmentDetails(appointment),
-                          );
-                        },
-                      ),
-          ),
-        ],
+            // Appointments list
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _appointments.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.calendar_today,
+                                size: 64,
+                                color: Colors.grey,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'No appointments found',
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Try adjusting your filters',
+                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : RefreshIndicator(
+                          onRefresh: _loadAppointments,
+                          child: ListView.builder(
+                            padding: const EdgeInsets.all(16),
+                            itemCount: _appointments.length,
+                            itemBuilder: (context, index) {
+                              final appointment = _appointments[index];
+                              return _AppointmentCard(
+                                appointment: appointment,
+                                onTap: () => _showAppointmentDetails(context, appointment),
+                              );
+                            },
+                          ),
+                        ),
+            ),
+          ],
+        ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _createAppointment,
@@ -293,7 +321,7 @@ class _AppointmentListViewState extends State<AppointmentListView> {
     }
   }
 
-  void _showAppointmentDetails(Appointment appointment) {
+  void _showAppointmentDetails(BuildContext context, Appointment appointment) {
     showModalBottomSheet(
       context: context,
       builder: (context) => AppointmentDetailsSheet(
@@ -329,6 +357,9 @@ class _AppointmentCard extends StatelessWidget {
         ['pending', 'confirmed'].contains(appointment.status.toLowerCase());
     final canCancel = (isStudent && isOwnAppointment && 
         ['pending', 'confirmed'].contains(appointment.status.toLowerCase()));
+    final isOnline = appointment.locationType == 'online';
+    final canAddMeetingLink = isCounselor && isOnline && 
+        ['confirmed'].contains(appointment.status.toLowerCase());
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -467,10 +498,23 @@ class _AppointmentCard extends StatelessWidget {
   Future<void> _updateStatus(BuildContext context, String newStatus) async {
     try {
       final appointmentService = AppointmentService();
-      await appointmentService.updateStatus(
-        appointment.id,
-        newStatus,
-      );
+      
+      // If completing the appointment, show a dialog for remarks
+      if (newStatus.toLowerCase() == 'completed') {
+        final remarks = await _showRemarksDialog(context);
+        if (remarks == null) return; // User cancelled
+        
+        await appointmentService.updateStatus(
+          appointment.uuid,
+          newStatus,
+          notes: remarks,
+        );
+      } else {
+        await appointmentService.updateStatus(
+          appointment.uuid,
+          newStatus,
+        );
+      }
       
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Appointment ${newStatus.toLowerCase()} successfully')),
@@ -486,6 +530,48 @@ class _AppointmentCard extends StatelessWidget {
         SnackBar(content: Text('Failed to update appointment: $e')),
       );
     }
+  }
+
+  Future<String?> _showRemarksDialog(BuildContext context) async {
+    final TextEditingController remarksController = TextEditingController();
+    
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Complete Appointment'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Please enter any remarks about this appointment:'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: remarksController,
+              decoration: const InputDecoration(
+                hintText: 'Enter remarks...',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 3,
+              autofocus: true,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(remarksController.text),
+            child: const Text('Complete'),
+          ),
+        ],
+      ),
+    );
+    
+    // Dispose controller to avoid memory leaks
+    remarksController.dispose();
+    
+    return result;
   }
 
   Widget _buildStatusChip() {
@@ -547,5 +633,69 @@ class _AppointmentCard extends StatelessWidget {
     if (confirmed == true) {
       await _updateStatus(context, 'cancelled');
     }
+  }
+
+  Future<void> _addMeetingLink(BuildContext context) async {
+    final TextEditingController linkController = TextEditingController(
+      text: appointment.location,
+    );
+    
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Meeting Link'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Paste the meeting URL for this appointment:'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: linkController,
+              decoration: const InputDecoration(
+                hintText: 'https://meet.google.com/...',
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.url,
+              autofocus: true,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(linkController.text),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    
+    if (result != null) {
+      try {
+        final appointmentService = AppointmentService();
+        await appointmentService.updateLocation(
+          appointment.uuid,
+          result,
+        );
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Meeting link updated successfully')),
+        );
+        
+        // Find the nearest AppointmentListView state and refresh
+        final listViewState = context.findAncestorStateOfType<_AppointmentListViewState>();
+        listViewState?._loadAppointments();
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update meeting link: $e')),
+        );
+      }
+    }
+    
+    // Dispose controller to avoid memory leaks
+    linkController.dispose();
   }
 } 

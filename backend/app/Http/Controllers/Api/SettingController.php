@@ -15,14 +15,20 @@ class SettingController extends Controller
         return response()->json(SettingsService::getAllSettings());
     }
 
+    public function termsAndConditions()
+    {
+        $terms = SettingsService::get('terms_and_conditions');
+        return response()->json([
+            'terms_and_conditions' => $terms
+        ]);
+    }
+
     public function update(Request $request)
     {
         $validated = $request->validate([
-            'site_name' => 'required|string|max:255',
-            'site_logo' => 'nullable|string',
-            'business_name' => 'required|string|max:255',
-            'business_address' => 'required|string',
+            'terms_and_conditions' => 'required|string',
         ]);
+        
         foreach ($validated as $key => $value) {
             SettingsService::set($key, $value);
         }

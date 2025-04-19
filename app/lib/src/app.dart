@@ -134,24 +134,21 @@ class MyApp extends StatelessWidget {
             themeMode: settingsController.themeMode,
             home: Builder(
               builder: (context) {
-                return StreamBuilder<bool>(
-                  stream: authController.authStateStream,
-                  builder: (context, snapshot) {
-                    if (authController.isLoading) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
+                if (authController.isLoading) {
+                  return const Scaffold(
+                    body: Center(child: CircularProgressIndicator()),
+                  );
+                }
 
-                    if (!authController.isAuthenticated) {
-                      return const LoginView();
-                    }
+                if (!authController.isAuthenticated) {
+                  return const LoginView();
+                }
 
-                    // Check if user is a counselor
-                    final isCounselor = authController.user?['roles']?.contains('counselor') ?? false;
-                    return isCounselor 
-                        ? const AppointmentListView() 
-                        : const HomeView();
-                  },
-                );
+                // Check if user is a counselor
+                final isCounselor = authController.user?['roles']?.contains('counselor') ?? false;
+                return isCounselor 
+                    ? const AppointmentListView() 
+                    : const HomeView();
               },
             ),
             onGenerateRoute: (RouteSettings settings) {

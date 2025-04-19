@@ -60,6 +60,12 @@ const routes = [
             name: 'UserManagement',
             component: () => import('@/views/Settings/UserManagement.vue'),
             meta: { requiresAuth: true, permission: 'manage users' }
+          },
+          {
+            path: 'site',
+            name: 'SiteSettings',
+            component: () => import('@/views/Settings/SiteSettings.vue'),
+            meta: { requiresAuth: true, permission: 'manage users' }
           }
         ]
       },

@@ -12,14 +12,20 @@ use App\Services\AppointmentScheduleService;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use App\Services\NotificationService;
 
 class AppointmentController extends Controller
 {
     protected $scheduleService;
+    protected $notificationService;
 
-    public function __construct(AppointmentScheduleService $scheduleService)
+    public function __construct(
+        AppointmentScheduleService $scheduleService,
+        NotificationService $notificationService
+    )
     {
         $this->scheduleService = $scheduleService;
+        $this->notificationService = $notificationService;
     }
 
     // Time slot interval in minutes (can be moved to settings later)
@@ -190,7 +196,7 @@ class AppointmentController extends Controller
     public function update(Request $request, Appointment $appointment)
     {
         // Log the appointment for debugging
-        \Log::info('Updating appointment:', [
+        \Illuminate\Support\Facades\Log::info('Updating appointment:', [
             'uuid' => $appointment->uuid,
             'data' => $request->all()
         ]);
@@ -206,11 +212,86 @@ class AppointmentController extends Controller
         $validated = $request->validate([
             'status' => ['sometimes', 'required', 'in:pending,confirmed,cancelled,completed'],
             'notes' => ['sometimes', 'nullable', 'string'],
+            'location' => ['sometimes', 'nullable', 'string', 'max:255'],
         ]);
 
+        // Store old status for notification check
+        $oldStatus = $appointment->status;
+        
         $appointment->update($validated);
+        
+        // If status has changed, send notifications
+        if (isset($validated['status']) && $validated['status'] !== $oldStatus) {
+            $this->sendStatusChangeNotification($appointment, $oldStatus);
+        }
 
         return new AppointmentResource($appointment->fresh());
+    }
+    
+    /**
+     * Send push notification when appointment status changes
+     */
+    private function sendStatusChangeNotification(Appointment $appointment, string $oldStatus)
+    {
+        try {
+            // Load related models if not already loaded
+            if (!$appointment->relationLoaded('student')) {
+                $appointment->load('student');
+            }
+            if (!$appointment->relationLoaded('counselor')) {
+                $appointment->load('counselor');
+            }
+            
+            // Different messages for different status changes
+            $title = 'Appointment Update';
+            $body = '';
+            
+            switch ($appointment->status) {
+                case 'confirmed':
+                    $body = 'Your appointment has been confirmed';
+                    break;
+                case 'cancelled':
+                    $body = 'Your appointment has been cancelled';
+                    break;
+                case 'completed':
+                    $body = 'Your appointment has been marked as completed';
+                    break;
+                default:
+                    $body = 'Your appointment status has been updated to ' . $appointment->status;
+            }
+            
+            // Appointment data for deep linking
+            $data = [
+                'appointment_id' => $appointment->uuid,
+                'type' => 'appointment_update',
+                'old_status' => $oldStatus,
+                'new_status' => $appointment->status
+            ];
+            
+            // Send to student
+            if ($appointment->student && $appointment->student->fcm_token) {
+                $this->notificationService->sendNotification(
+                    $appointment->student->fcm_token,
+                    $title,
+                    $body,
+                    $data
+                );
+            }
+            
+            // Send to counselor if status was updated by student
+            if ($oldStatus === 'pending' && $appointment->status === 'cancelled' && 
+                $appointment->counselor && $appointment->counselor->fcm_token) {
+                $this->notificationService->sendNotification(
+                    $appointment->counselor->fcm_token,
+                    'Appointment Cancelled',
+                    'A student has cancelled their appointment',
+                    $data
+                );
+            }
+        } catch (\Exception $e) {
+            // Log error but don't interrupt the flow
+            Log::error('Failed to send appointment notification: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -337,9 +418,14 @@ class AppointmentController extends Controller
         // Check if user has permission to delete this appointment
         $user = request()->user();
         
-        // Only admin can delete appointments
+        // Counselors can delete any appointment
         if (!$user->hasRole('counselor')) {
-            abort(403, 'Unauthorized to delete appointments');
+            // Students can only delete their own appointments
+            if ($user->id === $appointment->student_id) {
+                // Allow student to delete their own appointment
+            } else {
+                abort(403, 'Unauthorized to delete appointments');
+            }
         }
 
         // Delete the appointment

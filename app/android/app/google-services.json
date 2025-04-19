@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "236839298926",
+    "project_id": "ehealom",
+    "storage_bucket": "ehealom.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:236839298926:android:31337e700812a9e724837f",
+        "android_client_info": {
+          "package_name": "com.ehealom.ehealomapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD37p912dn5G1Wa62Bh_ctY1nm0nhkZlgA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import '../services/auth_service.dart';
 import '../services/storage_service.dart';
 import 'dart:async';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import '../api/api_service.dart';
 
 class AuthController with ChangeNotifier {
   final AuthService _authService = AuthService();
@@ -72,6 +74,9 @@ class AuthController with ChangeNotifier {
       await _fetchUser();
       _isAuthenticated = true;
       debugPrint('AuthController: Login process completed successfully');
+
+      // Attempt to update FCM token
+      await _updateFCMToken();
     } catch (e) {
       debugPrint('AuthController: Login error - $e');
       _isAuthenticated = false;
@@ -82,6 +87,20 @@ class AuthController with ChangeNotifier {
       _isLoading = false;
       notifyListeners();
       debugPrint('AuthController: Login process finished');
+    }
+  }
+
+  Future<void> _updateFCMToken() async {
+    try {
+      final fcmToken = await FirebaseMessaging.instance.getToken();
+      if (fcmToken != null) {
+        await _authService.updateFCMToken(fcmToken);
+        debugPrint('AuthController: FCM token updated successfully');
+      } else {
+        debugPrint('AuthController: FCM token is null');
+      }
+    } catch (e) {
+      debugPrint('AuthController: Error updating FCM token - $e');
     }
   }
 
@@ -104,6 +123,9 @@ class AuthController with ChangeNotifier {
       debugPrint('✅ AuthController: Registration and login completed successfully');
       // Broadcast auth state change
       _authStateController.add(true);
+      
+      // Attempt to update FCM token
+      await _updateFCMToken();
       
     } catch (e) {
       debugPrint('❌ AuthController: Registration error - $e');

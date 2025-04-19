@@ -21,6 +21,7 @@ class Appointment extends Model
         'location_type',
         'location',
         'status',
+        'notes',
     ];
 
     protected $casts = [

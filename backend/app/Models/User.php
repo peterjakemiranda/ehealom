@@ -35,7 +35,8 @@ class User extends Authenticatable
         'course',
         'major',
         'academic_rank',
-        'is_active'
+        'is_active',
+        'fcm_token'
     ];
 
     /**

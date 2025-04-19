@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\ResourceController;
 use App\Http\Controllers\Api\AppointmentController;
 use App\Http\Controllers\Api\CounselorScheduleController;
 use App\Http\Controllers\Api\ChatController;
+use App\Http\Controllers\Api\NotificationController;
 
 /*
 |--------------------------------------------------------------------------
@@ -37,9 +38,15 @@ use App\Http\Controllers\Api\ChatController;
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
+// Public settings routes
+Route::get('/settings/terms', [SettingController::class, 'termsAndConditions']);
+
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
+
+    // FCM Notification Token updates
+    Route::post('/notification/token', [NotificationController::class, 'updateToken']);
 
     Route::apiResource('categories', CategoryController::class);
     

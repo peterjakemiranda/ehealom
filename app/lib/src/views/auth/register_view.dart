@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../controllers/auth_controller.dart';
+import '../../services/settings_service.dart';
+import '../../widgets/terms_and_conditions_dialog.dart';
 
 class RegisterView extends StatefulWidget {
   static const routeName = '/register';
@@ -31,6 +33,10 @@ class _RegisterViewState extends State<RegisterView> {
   String _selectedUserType = 'student';
   String _selectedSex = 'male';
   String _selectedMaritalStatus = 'single';
+  bool _acceptedTerms = false;
+  late final SettingsService _settingsService;
+  String _termsAndConditions = 'Loading terms and conditions...';
+  bool _isLoadingTerms = true;
 
   // Base department options
   final List<Map<String, String>> _baseDepatments = [
@@ -54,6 +60,37 @@ class _RegisterViewState extends State<RegisterView> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _settingsService = SettingsService();
+    _loadTermsAndConditions();
+  }
+
+  Future<void> _loadTermsAndConditions() async {
+    setState(() {
+      _isLoadingTerms = true;
+    });
+    
+    final terms = await _settingsService.getTermsAndConditions();
+    
+    if (mounted) {
+      setState(() {
+        _termsAndConditions = terms;
+        _isLoadingTerms = false;
+      });
+    }
+  }
+
+  void _showTermsDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => TermsAndConditionsDialog(
+        termsAndConditions: _termsAndConditions,
+      ),
+    );
+  }
+
+  @override
   void dispose() {
     _nameController.dispose();
     _usernameController.dispose();
@@ -71,6 +108,12 @@ class _RegisterViewState extends State<RegisterView> {
 
   Future<void> _handleRegister() async {
     if (!_formKey.currentState!.validate()) return;
+    if (!_acceptedTerms) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please accept the terms and conditions')),
+      );
+      return;
+    }
 
     setState(() => _isLoading = true);
 
@@ -445,6 +488,51 @@ class _RegisterViewState extends State<RegisterView> {
                         if (value != _passwordController.text) return 'Passwords do not match';
                         return null;
                       },
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Terms and Conditions Checkbox
+                    Row(
+                      children: [
+                        Checkbox(
+                          value: _acceptedTerms,
+                          onChanged: (value) {
+                            setState(() {
+                              _acceptedTerms = value ?? false;
+                            });
+                          },
+                        ),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: _showTermsDialog,
+                            child: RichText(
+                              text: TextSpan(
+                                text: 'I agree to the ',
+                                style: TextStyle(
+                                  color: Theme.of(context).textTheme.bodyMedium?.color,
+                                ),
+                                children: [
+                                  TextSpan(
+                                    text: 'Terms and Conditions',
+                                    style: TextStyle(
+                                      color: Theme.of(context).primaryColor,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                  ),
+                                  if (_isLoadingTerms)
+                                    TextSpan(
+                                      text: ' (Loading...)',
+                                      style: TextStyle(
+                                        color: Theme.of(context).primaryColor,
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 24),
 

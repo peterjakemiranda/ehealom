@@ -29,13 +29,6 @@ class _HomeViewState extends State<HomeView> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final user = context.read<AuthController>().user;
-      debugPrint('HomeView - User data: $user');
-      
-      // Add listener for auth state changes
-      context.read<AuthController>().addListener(_handleAuthStateChange);
-    });
     _loadData();
   }
 
@@ -45,83 +38,65 @@ class _HomeViewState extends State<HomeView> {
     final authController = context.read<AuthController>();
     
     if (!authController.isAuthenticated && !authController.isLoading) {
-      debugPrint('User not authenticated, redirecting to login');
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        Navigator.of(context).pushReplacementNamed('/login');
+        if (mounted) {
+          Navigator.of(context).pushReplacementNamed('/login');
+        }
       });
       return;
     }
-    
-    final user = authController.user;
-    debugPrint('HomeView - didChangeDependencies - User data: $user');
   }
 
   @override
   void dispose() {
-    // Remove listener when disposing
-    context.read<AuthController>().removeListener(_handleAuthStateChange);
     super.dispose();
   }
 
-  void _handleAuthStateChange() {
-    final authController = context.read<AuthController>();
-    if (!authController.isAuthenticated && !authController.isLoading) {
-      debugPrint('User logged out, redirecting to login');
-      if (mounted) {
-        Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
-      }
-    }
-  }
-
   Future<void> _loadData() async {
-    setState(() => _isLoading = true);
+    if (!mounted) return;
+    
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
     try {
       final appointmentsResult = await _appointmentService.fetchAppointments(
         perPage: 5,
         page: 1,
         upcoming: true,
       );
-      
       final resourcesResult = await _resourceService.fetchResources(
         perPage: 3,
       );
-
-      debugPrint('Appointments Result: ${jsonEncode(appointmentsResult)}');
-      debugPrint('Resources Result: ${jsonEncode(resourcesResult)}');
-
-      final appointmentsList = appointmentsResult['data'] as List?;
-      final resourcesList = resourcesResult['data'] as List?;
-
-      debugPrint('Appointments List Length: ${appointmentsList?.length}');
-      debugPrint('Resources List Length: ${resourcesList?.length}');
-
+      
+      if (!mounted) return;
+      
       setState(() {
-        _upcomingAppointments = (appointmentsList ?? [])
-            .map((item) {
-              debugPrint('Processing appointment item: $item');
-              return Appointment.fromJson(item as Map<String, dynamic>);
+        _upcomingAppointments = (appointmentsResult['data'] as List?)
+            ?.map((item) => Appointment.fromJson(item as Map<String, dynamic>))
+            .where((apt) {
+              final now = DateTime.now();
+              return apt.status.toLowerCase() == 'confirmed' && 
+                     apt.appointmentDate.isAfter(now);
             })
-            .toList();
-
-        _relatedResources = (resourcesList ?? [])
-            .map((item) {
-              debugPrint('Processing resource item: $item');
-              return Resource.fromJson(item as Map<String, dynamic>);
-            })
-            .toList();
-        
-        debugPrint('Processed Appointments Count: ${_upcomingAppointments.length}');
-        debugPrint('Processed Resources Count: ${_relatedResources.length}');
-        
+            .toList() ?? [];
+            
+        _relatedResources = (resourcesResult['data'] as List?)
+            ?.map((item) => Resource.fromJson(item as Map<String, dynamic>))
+            .toList() ?? [];
+            
         _isLoading = false;
       });
     } catch (e, stackTrace) {
       debugPrint('❌ Error in _loadData: $e');
       debugPrint('❌ Stack trace: $stackTrace');
-      setState(() {
-        _error = e.toString();
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -238,9 +213,12 @@ class _HomeViewState extends State<HomeView> {
   }
 
   Widget _buildUpcomingAppointment() {
-    // Filter for confirmed appointments only
+    // Filter for confirmed appointments only and ensure they are in the future
+    final now = DateTime.now();
     final confirmedAppointments = _upcomingAppointments
-        .where((apt) => apt.status.toLowerCase() == 'confirmed' || apt.status.toLowerCase() == 'pending')
+        .where((apt) => 
+            (apt.status.toLowerCase() == 'confirmed' || apt.status.toLowerCase() == 'pending') &&
+            apt.appointmentDate.isAfter(now))
         .toList();
 
     if (confirmedAppointments.isEmpty) {

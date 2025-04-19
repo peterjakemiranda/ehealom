@@ -27,6 +27,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             RolesAndPermissionsSeeder::class,
             CategorySeeder::class,
+            SettingsTableSeeder::class,
         ]);
 
         // Ensure admin has admin role
