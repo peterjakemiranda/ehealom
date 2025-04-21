@@ -202,7 +202,7 @@ class AuthService {
     
     try {
       final response = await _client.post(
-        Uri.parse('${ApiConfig.baseUrl}/api/notification/token'),
+        Uri.parse('${ApiConfig.baseUrl}/notification/token'),
         headers: _authHeaders(token),
         body: jsonEncode({'fcm_token': fcmToken}),
       );
