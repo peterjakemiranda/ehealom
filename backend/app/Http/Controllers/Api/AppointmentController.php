@@ -186,8 +186,63 @@ class AppointmentController extends Controller
             'status' => $request->user()->hasRole('counselor') ? 'confirmed' : 'pending',
             'category_id' => $validated['category_id'],
         ]);
+        
+        // Send notification to counselor if the booking was made by a student/client
+        if (!$request->user()->hasRole('counselor')) {
+            $this->sendNewAppointmentNotification($appointment);
+        }
 
         return new AppointmentResource($appointment);
+    }
+    
+    /**
+     * Send push notification when a new appointment is created by a student/client
+     */
+    private function sendNewAppointmentNotification(Appointment $appointment)
+    {
+        try {
+            // Load related models if not already loaded
+            if (!$appointment->relationLoaded('student')) {
+                $appointment->load('student');
+            }
+            if (!$appointment->relationLoaded('counselor')) {
+                $appointment->load('counselor');
+            }
+            
+            // Check if the counselor has an FCM token
+            if (!$appointment->counselor || !$appointment->counselor->fcm_token) {
+                Log::info('Counselor has no FCM token for notifications');
+                return;
+            }
+            
+            // Format the appointment date for display
+            $formattedDate = Carbon::parse($appointment->appointment_date)->format('F j, Y \a\t g:i A');
+            
+            // Data for deep linking
+            $data = [
+                'appointment_id' => $appointment->uuid,
+                'type' => 'new_appointment',
+                'status' => $appointment->status
+            ];
+            
+            // Send notification to counselor
+            $this->notificationService->sendNotification(
+                $appointment->counselor->fcm_token,
+                'New Appointment Request',
+                'You have a new appointment request from ' . $appointment->student->name . ' on ' . $formattedDate,
+                $data
+            );
+            
+            Log::info('Sent new appointment notification to counselor', [
+                'counselor_id' => $appointment->counselor_id,
+                'appointment_uuid' => $appointment->uuid
+            ]);
+        } catch (\Exception $e) {
+            // Log error but don't interrupt the flow
+            Log::error('Failed to send new appointment notification: ' . $e->getMessage(), [
+                'exception' => $e
+            ]);
+        }
     }
 
     /**
