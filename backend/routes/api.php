@@ -105,4 +105,11 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // Chat routes
     Route::get('/chat/messages', [ChatController::class, 'index']);
     Route::post('/chat/messages', [ChatController::class, 'store']);
+
+    // Reporting Routes
+    Route::prefix('reports')->middleware('permission:view reports')->group(function () {
+        Route::get('appointments-by-category-daily', [ReportController::class, 'appointmentsByCategoryDaily']);
+        Route::get('appointments-by-age-daily', [ReportController::class, 'appointmentsByAgeDaily']);
+        Route::get('appointments-by-department-daily', [ReportController::class, 'appointmentsByDepartmentDaily']);
+    });
 });

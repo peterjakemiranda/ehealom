@@ -2,15 +2,17 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../config/env.dart';
+import '../services/auth_service.dart';
 
 /// Service to handle API requests to the backend
 class ApiService {
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
   final String _baseUrl = Environment.apiUrl;
+  final AuthService _authService = AuthService();
   
   /// Get the stored auth token
   Future<String?> getToken() async {
-    return await _secureStorage.read(key: 'auth_token');
+    return await _authService.getToken();
   }
   
   /// Set default headers with authentication if token is available

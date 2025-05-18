@@ -2,13 +2,15 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../config/constants.dart';
+import '../services/auth_service.dart';
 
 class ApiHelper {
   final _storage = const FlutterSecureStorage();
   final _client = http.Client();
+  final _authService = AuthService();
 
   Future<Map<String, String>> _getHeaders() async {
-    final token = await _storage.read(key: 'auth_token');
+    final token = await _authService.getToken();
     return {
       'Accept': 'application/json',
       'Content-Type': 'application/json',

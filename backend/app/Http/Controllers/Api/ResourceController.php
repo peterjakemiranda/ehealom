@@ -77,8 +77,10 @@ class ResourceController extends Controller
     public function show(Resource $resource)
     {
         // Check if the resource is published or if user has permission to view unpublished
-        if (!$resource->is_published && !auth()->user()->can('manage resources')) {
-            return response()->json(['message' => 'Resource not found'], 404);
+        if (!$resource->is_published) {
+            if (!auth()->check() || !auth()->user()->can('manage resources')) {
+                return response()->json(['message' => 'Resource not found'], 404);
+            }
         }
 
         return new ResourceResource($resource);

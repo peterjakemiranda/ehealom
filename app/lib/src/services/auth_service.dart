@@ -10,6 +10,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 class AuthService {
   late final http.Client _client;
   final _storage = const FlutterSecureStorage();
+  // In-memory token storage
+  static String? _inMemoryToken;
 
   AuthService() {
     HttpClient client = HttpClient()
@@ -104,31 +106,31 @@ class AuthService {
       }
 
       // Clear stored token and data
-      await _storage.delete(key: StorageKeys.authToken);
+      await clearToken();
       await _storage.delete(key: StorageKeys.userData);
       
     } catch (e) {
       debugPrint('❌ AuthService logout error: $e');
       // Still clear storage on error
-      await _storage.delete(key: StorageKeys.authToken);
+      await clearToken();
       await _storage.delete(key: StorageKeys.userData);
       rethrow;
     }
   }
 
+  // Store token in memory only
   Future<void> _saveToken(String token) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(StorageKeys.authToken, token);
+    _inMemoryToken = token;
   }
 
+  // Get token from memory only
   Future<String?> getToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(StorageKeys.authToken);
+    return _inMemoryToken;
   }
 
+  // Clear the in-memory token
   Future<void> clearToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(StorageKeys.authToken);
+    _inMemoryToken = null;
   }
 
   // Update headers to include Accept header for Sanctum

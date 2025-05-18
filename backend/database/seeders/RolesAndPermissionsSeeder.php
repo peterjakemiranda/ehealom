@@ -29,11 +29,15 @@ class RolesAndPermissionsSeeder extends Seeder
         // Settings
         'manage settings',
         'view settings',
+
+        // Report Permissions
+        'view reports',
     ];
 
     protected $rolePermissions = [
         'counselor' => [
-            '*'
+            '*',
+            'view reports',
         ],
         'student' => [
             'view appointments',

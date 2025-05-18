@@ -77,7 +77,7 @@ class _HomeViewState extends State<HomeView> {
             ?.map((item) => Appointment.fromJson(item as Map<String, dynamic>))
             .where((apt) {
               final now = DateTime.now();
-              return apt.status.toLowerCase() == 'confirmed' && 
+              return (apt.status.toLowerCase() == 'confirmed' || apt.status.toLowerCase() == 'pending') && 
                      apt.appointmentDate.isAfter(now);
             })
             .toList() ?? [];

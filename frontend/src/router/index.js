@@ -8,6 +8,7 @@ import ResourceList from '@/views/ResourceList.vue'
 import AppointmentList from '@/views/AppointmentList.vue'
 import CounselorSchedule from '@/views/Settings/CounselorSchedule.vue'
 import ProfileView from '@/views/ProfileView.vue'
+import ReportPage from '@/views/ReportPage.vue'
 
 const routes = [
   {
@@ -76,6 +77,15 @@ const routes = [
         meta: {
           requiresAuth: true,
           title: 'My Profile'
+        }
+      },
+      {
+        path: '/reports',
+        name: 'Reports',
+        component: ReportPage,
+        meta: {
+          requiresAuth: true,
+          permission: 'view reports'
         }
       }
     ]
