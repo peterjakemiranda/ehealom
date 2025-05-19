@@ -28,6 +28,7 @@ class DatabaseSeeder extends Seeder
             RolesAndPermissionsSeeder::class,
             CategorySeeder::class,
             SettingsTableSeeder::class,
+            DummyAppointmentsSeeder::class,
         ]);
 
         // Ensure admin has admin role

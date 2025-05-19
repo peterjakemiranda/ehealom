@@ -2,19 +2,33 @@
   <div class="container mx-auto p-4">
     <div class="flex justify-between items-center mb-6">
       <h1 class="text-2xl font-bold">Appointment Reports (Daily Series)</h1>
-      <div>
-        <label for="period-filter" class="mr-2 text-sm font-medium text-gray-700">Filter by Period:</label>
-        <select 
-          id="period-filter"
-          v-model="selectedPeriod"
-          @change="handlePeriodChange"
-          class="select select-bordered select-sm"
-        >
-          <option value="last_7_days">Last 7 Days</option>
-          <option value="last_30_days">Last 30 Days</option>
-          <option value="last_90_days">Last 90 Days</option>
-          <option value="last_365_days">Last 365 Days</option>
-        </select>
+      <div class="flex gap-4">
+        <div>
+          <label for="period-filter" class="mr-2 text-sm font-medium text-gray-700">Filter by Period:</label>
+          <select 
+            id="period-filter"
+            v-model="selectedPeriod"
+            @change="handlePeriodChange"
+            class="select select-bordered select-sm"
+          >
+            <option value="last_7_days">Last 7 Days</option>
+            <option value="last_30_days">Last 30 Days</option>
+            <option value="last_90_days">Last 90 Days</option>
+            <option value="last_365_days">Last 365 Days</option>
+          </select>
+        </div>
+        <div>
+          <label for="forecast-days" class="mr-2 text-sm font-medium text-gray-700">Forecast Days:</label>
+          <select 
+            id="forecast-days"
+            v-model="forecastDays"
+            @change="handlePeriodChange"
+            class="select select-bordered select-sm"
+          >
+            <option value="7">7 Days</option>
+            <option value="30">30 Days</option>
+          </select>
+        </div>
       </div>
     </div>
 
@@ -91,6 +105,7 @@ import {
 } from 'chart.js';
 import 'chartjs-adapter-date-fns';
 import { Line } from 'vue-chartjs';
+import annotationPlugin from 'chartjs-plugin-annotation';
 
 ChartJS.register(
   CategoryScale,
@@ -101,11 +116,13 @@ ChartJS.register(
   Tooltip,
   Legend,
   TimeScale, 
-  TimeSeriesScale
+  TimeSeriesScale,
+  annotationPlugin
 );
 
 const reportStore = useReportStore();
 const selectedPeriod = ref('last_30_days');
+const forecastDays = ref('30');
 
 const chartOptions = (titleText) => ({
   responsive: true,
@@ -147,6 +164,40 @@ const chartOptions = (titleText) => ({
     tooltip: {
       mode: 'index',
       intersect: false,
+      callbacks: {
+        label: function(context) {
+          let label = context.dataset.label || '';
+          if (label) {
+            label += ': ';
+          }
+          label += context.parsed.y;
+          if (context.raw.is_forecast) {
+            label += ' (forecast)';
+          }
+          return label;
+        }
+      }
+    },
+    annotation: {
+      annotations: {
+        currentDate: {
+          type: 'line',
+          xMin: new Date().toISOString(),
+          xMax: new Date().toISOString(),
+          borderColor: 'rgba(0, 0, 0, 0.5)',
+          borderWidth: 2,
+          borderDash: [5, 5],
+          label: {
+            display: true,
+            content: 'Today',
+            position: 'top',
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            color: 'white',
+            padding: 4,
+            borderRadius: 4
+          }
+        }
+      }
     }
   },
   elements: {
@@ -167,7 +218,7 @@ const getRandomColor = () => {
 };
 
 const processDataForChart = (data, dateField, seriesField, countField) => {
-  if (!data || data.length === 0) return { datasets: [] };
+  if (!data || !Array.isArray(data) || data.length === 0) return { datasets: [] };
 
   const uniqueSeriesNames = [...new Set(data.map(item => item[seriesField]))].sort();
   
@@ -177,21 +228,39 @@ const processDataForChart = (data, dateField, seriesField, countField) => {
       .filter(d => d[seriesField] === name)
       .sort((a,b) => new Date(a[dateField]) - new Date(b[dateField]));
 
-    const seriesChartData = seriesRawData.map(item => ({
-      x: item[dateField],
-      y: item[countField]
-    }));
+    // Find the last actual data point
+    const lastActualIndex = seriesRawData.findIndex(d => d.is_forecast);
+    const lastActualDate = lastActualIndex > 0 ? seriesRawData[lastActualIndex - 1][dateField] : null;
 
     return {
       label: name || 'N/A',
-      data: seriesChartData,
+      data: seriesRawData.map(item => ({
+        x: item[dateField],
+        y: item[countField]
+      })),
       borderColor: color,
       backgroundColor: color.replace('0.9', '0.2'),
       tension: 0.1,
-      fill: false, 
+      fill: false,
+      borderWidth: 2,
+      segment: {
+        borderColor: ctx => {
+          if (lastActualDate && ctx.p1.parsed.x > lastActualDate) {
+            return color.replace('0.9', '0.5'); // Slightly transparent for forecast
+          }
+          return color;
+        },
+        borderWidth: ctx => {
+          if (lastActualDate && ctx.p1.parsed.x > lastActualDate) {
+            return 2; // Same width but different color
+          }
+          return 2;
+        }
+      }
     };
   });
-  return { datasets }; 
+
+  return { datasets };
 };
 
 const categoryChartData = computed(() => {
@@ -207,11 +276,20 @@ const departmentChartData = computed(() => {
 });
 
 const fetchDataForPeriod = async (period) => {
-  await Promise.allSettled([
-    reportStore.fetchAppointmentsByCategoryDaily({ period }),
-    reportStore.fetchAppointmentsByAgeDaily({ period }),
-    reportStore.fetchAppointmentsByDepartmentDaily({ period }),
-  ]);
+  const params = {
+    period,
+    forecast_days: parseInt(forecastDays.value)
+  };
+  
+  try {
+    await Promise.allSettled([
+      reportStore.fetchAppointmentsByCategoryDaily(params),
+      reportStore.fetchAppointmentsByAgeDaily(params),
+      reportStore.fetchAppointmentsByDepartmentDaily(params),
+    ]);
+  } catch (error) {
+    console.error('Error in fetchDataForPeriod:', error);
+  }
 };
 
 onMounted(() => {
@@ -227,4 +305,11 @@ const handlePeriodChange = () => {
 <style scoped>
 /* Ensure chart containers have a defined height if maintainAspectRatio is false */
 /* Handled by inline style on <Line> components for now */
+</style>
+
+<style>
+/* Add styles for forecast lines */
+.chartjs-render-monitor .forecast-line {
+  border-style: dashed;
+}
 </style> 
