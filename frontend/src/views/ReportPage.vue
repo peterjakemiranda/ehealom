@@ -18,15 +18,17 @@
           </select>
         </div>
         <div>
-          <label for="forecast-days" class="mr-2 text-sm font-medium text-gray-700">Forecast Days:</label>
+          <label for="forecast-days" class="mr-2 text-sm font-medium text-gray-700">Forecast:</label>
           <select 
             id="forecast-days"
             v-model="forecastDays"
             @change="handlePeriodChange"
             class="select select-bordered select-sm"
           >
-            <option value="7">7 Days</option>
-            <option value="30">30 Days</option>
+            <option value="7">Week</option>
+            <option value="30">Month</option>
+            <option value="90">Quarter</option>
+            <option value="365">Year</option>
           </select>
         </div>
       </div>
